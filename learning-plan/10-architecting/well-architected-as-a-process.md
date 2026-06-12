@@ -13,7 +13,7 @@ tags:
 
 # Well-Architected as a Process, Not a Checklist
 
-> Part of [[learning-plan/10-architecting/README|Architecting & Best Practices]].
+> Part of [[learning-plan/10-architecting/10-architecting|Architecting & Best Practices]].
 > Builds on [[learning-plan/10-architecting/requirements-gathering-checklist|Requirements Gathering Checklist]].
 
 ## The core lesson

@@ -14,7 +14,7 @@ tags:
 
 # Requirements Gathering Checklist
 
-> Part of [[learning-plan/10-architecting/README|Architecting & Best Practices]].
+> Part of [[learning-plan/10-architecting/10-architecting|Architecting & Best Practices]].
 > Source PDF: [[resources/Requirements_Checklist.pdf|Requirements Checklist (AWS)]]
 > Related: [[learning-plan/10-architecting/well-architected-as-a-process|Well-Architected as a Process, Not a Checklist]]
 

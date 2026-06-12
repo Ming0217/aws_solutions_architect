@@ -11,4 +11,4 @@ tags:
 CloudWatch (metrics, logs, alarms, dashboards), CloudTrail, X-Ray,
 and designing for operational visibility.
 
-> Back to [[learning-plan/README|the progress tracker]]. Add module notes here using [[templates/module-note|the module template]].
+> Back to [[learning-plan/learning-plan|the progress tracker]]. Add module notes here using [[templates/module-note|the module template]].

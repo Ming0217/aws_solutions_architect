@@ -13,7 +13,7 @@ tags:
 
 # CLI vs CloudFormation vs CDK
 
-> Part of [[learning-plan/08-automation-iac/README|Automation & IaC]].
+> Part of [[learning-plan/08-automation-iac/08-automation-iac|Automation & IaC]].
 
 ## The shared foundation
 

@@ -12,7 +12,7 @@ tags:
 
 # CapEx to OpEx Shift
 
-> Part of [[learning-plan/01-cloud-foundations/README|Cloud Foundations]].
+> Part of [[learning-plan/01-cloud-foundations/01-cloud-foundations|Cloud Foundations]].
 
 One of the foundational "why cloud" arguments: converting large upfront capital
 expenditures into predictable operational expenses, improving cash flow and planning.

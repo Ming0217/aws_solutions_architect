@@ -11,4 +11,4 @@ tags:
 RDS, Aurora, DynamoDB, ElastiCache, and choosing relational vs NoSQL.
 Read replicas, Multi-AZ, backups, and caching strategies.
 
-> Back to [[learning-plan/README|the progress tracker]]. Add module notes here using [[templates/module-note|the module template]].
+> Back to [[learning-plan/learning-plan|the progress tracker]]. Add module notes here using [[templates/module-note|the module template]].

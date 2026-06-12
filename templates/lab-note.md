@@ -13,7 +13,7 @@ tags:
 
 # Lab: <title>
 
-> Related: [[labs/README|labs index]]
+> Related: [[labs/labs|labs index]]
 
 ## Goal
 

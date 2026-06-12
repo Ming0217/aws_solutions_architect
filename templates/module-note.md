@@ -11,7 +11,7 @@ tags:
 
 # <Module / Course title>
 
-> Part of [[learning-plan/README|the learning plan]].
+> Part of [[learning-plan/learning-plan|the learning plan]].
 
 ## Key concepts
 
