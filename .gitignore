@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+# Obsidian vault config (per-machine settings, workspace layout, caches)
+.obsidian/
+
+# Obsidian trash
+.trash/
+
+# macOS
+.DS_Store
