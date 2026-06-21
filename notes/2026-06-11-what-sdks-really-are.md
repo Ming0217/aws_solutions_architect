@@ -38,6 +38,49 @@ Your code  ──>  SDK methods  ──>  (HTTP requests/auth/retries)  ──> 
   the SDK does, you could do with raw API calls; the SDK just handles request
   signing, retries/backoff, pagination, and serialization so you don't have to.
 
+## CLI vs a program (SDK) — same API, different driver's seat
+
+> Related: [[learning-plan/08-automation-iac/cli-vs-cloudformation-vs-cdk|CLI vs CloudFormation vs CDK]]
+
+Key thing that trips people up: **a CLI tool is itself a regular program** (the AWS CLI
+is written in Python). So the difference isn't "program vs not-a-program" — it's **who
+writes the logic and how you express intent.**
+
+- **CLI** — someone already wrote the program. You *run* it by typing a command + flags:
+  ```bash
+  aws ec2 start-instances --instance-ids i-1234567890
+  ```
+  You provide the command and arguments; the tool provides all the logic, auth, and
+  output formatting. Your vocabulary is whatever commands/flags the author exposed.
+
+- **Program (via SDK)** — you *write* the logic yourself, importing the SDK (e.g. boto3):
+  ```python
+  import boto3
+  ec2 = boto3.client("ec2")
+  for r in ec2.describe_instances()["Reservations"]:
+      for i in r["Instances"]:
+          if i["State"]["Name"] == "running":
+              print(i["InstanceId"])
+  ```
+  You own the control flow (loops, conditionals, error handling, combining calls); the
+  SDK provides the low-level API plumbing.
+
+| | CLI | Program (SDK) |
+| --- | --- | --- |
+| What it is | A finished program you *run* | Code you *write* |
+| Express intent via | Command + flags | Logic in a language |
+| Control flow (loops, if/else) | Limited (shell scripting glue) | Full language power |
+| Best for | Quick one-off tasks, manual ops | Complex logic, apps, reusable automation |
+| Who wrote the logic | The tool's author | You |
+
+**Analogy:** the CLI is a microwave with labeled buttons (fast, but only the buttons you're
+given); a program/SDK is raw ingredients + a stove (more work, but you can cook anything).
+
+**The bridge:** because a CLI is just a program, you *can* string commands together in a
+**shell script** with bash loops/conditionals. Once that logic gets complex, you're
+writing a program the hard way — the signal to switch to an SDK. Either way, both bottom
+out in the **same AWS API** (see [[learning-plan/01-cloud-foundations/aws-is-services-over-hardware-via-api|the API is the only door in]]).
+
 ## Nuances / things to revisit
 
 - **"Thin" varies.** Some SDKs are near pass-throughs; others add real value beyond
