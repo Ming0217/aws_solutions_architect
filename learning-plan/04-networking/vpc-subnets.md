@@ -82,6 +82,54 @@ routing decides what's exposed. The public subnet holds only what must be
 internet-facing; everything else — app logic, data — defaults to private, blocked
 at the network layer even before security groups come into play.
 
+## Internet Gateway, Route Tables & Subnet Associations
+
+Three pieces, like a house's connection to the street.
+
+**Internet Gateway (IGW) — the front door of the VPC**
+
+- A single, AWS-managed, highly-available component. You create one and **attach
+  it to exactly one VPC**. Attaching it just means "this VPC now has a door to the
+  internet" — nothing flows through it yet.
+- It does the NAT translation between an instance's private IP and its public IP
+  for internet-bound traffic, automatically, once traffic is routed to it.
+- No subnet talks to the IGW directly by default. Attaching the IGW alone doesn't
+  make anything public.
+
+**Route Table — the directions, "for this destination, go this way"**
+
+- A list of rules: `destination CIDR → target`. Every route table gets one rule
+  for free: `<VPC CIDR> → local` — anything inside the VPC is delivered directly,
+  no gateway needed. This is why subnets in the same VPC can always reach each
+  other regardless of public/private status.
+- To make a subnet public, add one more rule to *its* route table:
+  `0.0.0.0/0 → igw-xxxx`.
+- A private subnet stays private simply because its route table has **no such
+  line** — only the local rule. Traffic to the internet has nowhere to go, so
+  it's dropped.
+
+**Subnet association — which directions apply to which subnet**
+
+- A subnet itself has no "public" or "private" flag — it's just a CIDR block.
+  What determines its behavior is **which route table it's associated with**.
+- Each subnet is associated with exactly one route table at a time. A route table
+  can be associated with multiple subnets (e.g. two public subnets in different
+  AZs sharing the same route-table-with-IGW-rule).
+
+**Lab checks, mapped to the concepts:**
+
+| Check | What it verifies |
+| --- | --- |
+| IGW attached to VPC | The door exists and is connected to this VPC at all |
+| Public subnet has route to IGW | That subnet's route table says "for the internet, use the door" |
+| Private subnet has no route to IGW | That subnet's route table has no such line — nowhere to go, so it's isolated |
+
+> **Gotcha:** a route to the IGW alone doesn't make an *instance* reachable from
+> the internet. The instance also needs a public IP (or Elastic IP), and its
+> security group needs to allow the inbound traffic. The route table gets you to
+> the door — the instance still needs an address people can find and a security
+> group that lets them knock.
+
 ## Questions / things to revisit
 
 -
