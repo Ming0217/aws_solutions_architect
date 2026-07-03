@@ -94,6 +94,43 @@ credentials they use** and **what they represent.**
 - Called an *identity* policy because it attaches to an identity. (A *resource* policy
   attaches to the resource instead — e.g. an S3 bucket policy — that's the next layer.)
 
+## How a role actually gets associated with a user/group/service
+
+A role isn't "attached" the way a policy is — it's **assumed**. Two things have to
+line up for that to work:
+
+1. **The role's trust policy** — a resource-based policy *on the role itself*
+   listing which principals may call `sts:AssumeRole` on it (a user ARN, another
+   AWS account, or an AWS service like `ec2.amazonaws.com`).
+2. **The assumer's own permission** — unless it's an AWS service, the assuming
+   user/role also needs an identity policy granting `sts:AssumeRole` on that
+   specific role's ARN. Both sides must agree: trust policy says "you may,"
+   identity policy says "I'm allowed to try."
+
+How this plays out per identity type:
+
+- **User → Role:** add the user's ARN to the role's trust policy, and grant the
+  user (or a group they're in) `sts:AssumeRole` on that role. The user then runs
+  `aws sts assume-role` or clicks "Switch Role" in the console to get temporary
+  credentials.
+- **Group → Role:** never attach a role to a group directly — groups can't
+  authenticate or assume anything (no credentials of their own). Instead, attach
+  a policy to the group granting members `sts:AssumeRole` rights; each member
+  still individually assumes the role when needed.
+- **AWS service → Role:** the service is the trusted principal in the trust
+  policy (e.g. `ec2.amazonaws.com`), so there's no separate "permission to
+  assume" step on the service side.
+  - **EC2** is special: you can't attach a role to an instance directly — AWS
+    wraps it in an **instance profile** (a thin container around the role), and
+    you attach *that* to the instance at launch or later via Actions → Security
+    → Modify IAM role.
+  - **Lambda, ECS tasks, etc.** don't need an instance profile — you just pick
+    the execution role directly in that service's config.
+
+> Short version: roles are assumed, not attached — except for EC2, where the
+> console UI makes it *look* like attaching, but under the hood it's an instance
+> profile wrapping the same assume-role mechanism.
+
 ## Reading Figure 5.6
 
 ```
