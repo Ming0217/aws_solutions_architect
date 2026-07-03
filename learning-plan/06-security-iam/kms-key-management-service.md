@@ -116,6 +116,28 @@ separately from — and in addition to — bucket/object access rights.
 Bonus: every `kms:Decrypt` call is logged in CloudTrail, giving an audit trail
 of who actually *read* the data, not just who had bucket access.
 
+## Encryption at rest vs in transit
+
+- **At rest** — protects data *while stored on disk*. Before S3 writes an
+  object's bytes to the underlying storage medium, it encrypts them with the
+  data key; on read, it decrypts *after* retrieving from disk, before handing
+  the object back — assuming both the S3 and KMS permission gates pass. This is
+  what SSE-KMS above is doing.
+- **In transit** — protects data *while moving over the network* (e.g. TLS
+  between a client and S3, or between AWS services). A completely separate
+  mechanism (HTTPS/TLS) — SSE-KMS says nothing about how the object travels
+  to/from S3, only how it sits on disk.
+
+They defend against different threats: at-rest protects against someone
+getting physical/low-level access to storage (a stolen disk, an improperly
+decommissioned drive, an unauthorized snapshot); in-transit protects against
+someone intercepting traffic on the wire. A secure setup needs both.
+
+> Note: S3 always encrypts at rest by default (**SSE-S3**, an Amazon-owned key)
+> even if you never touch the setting. Enabling SSE-KMS with your own key
+> doesn't turn encryption *on* — it swaps the default key for yours, which is
+> what unlocks the second decrypt-gate above.
+
 ## Key Policy — the "permission slip" attached directly to the key
 
 - A resource-based policy that lives **on the key itself**, separate from any
