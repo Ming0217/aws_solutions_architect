@@ -28,6 +28,19 @@ The four IAM concepts click once you split them along **two separate questions**
 > Big idea: identity and permissions are **decoupled**. The *same* policy block can attach
 > to a user, a group, or a role (see Figure 5.6 — every Policy box looks identical).
 
+## The simple version
+
+- **User** — an individual person with their own permanent credentials, so nobody
+  has to share a password.
+- **Group** — a bucket of users. Attach a policy once to the "Finance" group
+  instead of to 50 people one by one.
+- **Role** — a **temporary hat** anyone (or anything) can wear. A user can assume
+  a role for temporary powers; an AWS service (e.g. EC2) can assume one to reach
+  another service (e.g. S3). Safer, because there's no permanent password to leak.
+- **Policy** — the actual **rulebook**: a JSON document saying "Allow S3 access" or
+  "Deny billing access." On its own it does nothing — it only takes effect once
+  attached to a User, Group, or Role.
+
 ## The "WHO" trio
 
 All three are identities that can call the AWS API. What separates them is **what kind of
