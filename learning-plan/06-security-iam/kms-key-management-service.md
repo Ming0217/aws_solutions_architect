@@ -109,6 +109,35 @@ ever handles the small data key.
 - Nothing that references the key (aliases, IAM policies, resource configs) has
   to change, since the ID stays stable — only the material behind it rotates.
 
+### How rotation actually works (without breaking old ciphertext)
+
+If the material changes, how can data encrypted last year still be decrypted
+this year? KMS never discards old key material — it just stops using it for
+*new* encryptions.
+
+- The **Key ID** is a permanent label — the vault's address. It never changes.
+- Behind that one Key ID, KMS keeps a **history of backing keys** (the actual
+  cryptographic material). On rotation, KMS generates a **new backing key** and
+  marks it "current" for all future `Encrypt` calls. **Old backing keys are kept
+  forever**, as long as the KMS key itself exists.
+- Ciphertext produced by `Encrypt` is **self-describing** — it embeds metadata
+  saying *which* backing key produced it. So `Decrypt` never needs a version
+  argument: you hand back the ciphertext, and KMS reads that metadata to reach
+  for the matching backing key automatically.
+
+**Extending the vault analogy:** the vault's address (Key ID) never moves, but
+every year the lock cylinder inside gets swapped for a new one. New items get
+locked with this year's cylinder; old cylinders are kept in a back room rather
+than thrown away, so anything locked with a previous cylinder can still be
+opened — you never have to say *which* cylinder to use, since each locked item
+"remembers" which one locked it.
+
+**Why this improves security:** if one year's backing key material were ever
+compromised, the blast radius is limited to whatever was encrypted during that
+one year window — not everything ever encrypted under that Key ID, since each
+year's data was actually locked with different underlying material, not the
+same key reused forever.
+
 ## Lab: building this hands-on
 
 1. Create a **Customer Managed Key**.
