@@ -87,6 +87,35 @@ KMS (vault)
 master key never leaves the vault and never touches your bulk data; KMS only
 ever handles the small data key.
 
+## Worked example: SSE-KMS on an S3 bucket
+
+Server-side encryption with KMS keys (**SSE-KMS**) is envelope encryption
+applied automatically by S3 — the practical version of the sequence above.
+
+- **On upload:** S3 calls your KMS key and asks it to generate a data key. S3
+  uses the plaintext copy to encrypt the object, discards it, and stores the
+  encrypted copy alongside the object.
+- **On read:** S3 sends the object's encrypted data key back to KMS to decrypt,
+  then uses the returned plaintext data key to decrypt the object before
+  returning it to the requester.
+
+**"An additional layer of control over who can decrypt" — what that buys you.**
+Compare it to the default, **SSE-S3** (Amazon-owned key, invisible to you):
+there, `s3:GetObject` permission alone is enough to read the object — one gate.
+With SSE-KMS there are **two gates**, and both must pass:
+
+1. **S3 permission** — `s3:GetObject` on the bucket/object (IAM/bucket policy).
+2. **KMS permission** — `kms:Decrypt` on *your specific key*, granted via its
+   **key policy**.
+
+So even if someone's IAM policy grants full S3 access, if your key's policy
+doesn't also let them call `kms:Decrypt`, they can fetch the (still-encrypted)
+bytes but never turn them back into plaintext. Decryption rights are enforced
+separately from — and in addition to — bucket/object access rights.
+
+Bonus: every `kms:Decrypt` call is logged in CloudTrail, giving an audit trail
+of who actually *read* the data, not just who had bucket access.
+
 ## Key Policy — the "permission slip" attached directly to the key
 
 - A resource-based policy that lives **on the key itself**, separate from any
