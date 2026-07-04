@@ -131,6 +131,38 @@ How this plays out per identity type:
 > console UI makes it *look* like attaching, but under the hood it's an instance
 > profile wrapping the same assume-role mechanism.
 
+## What happens when a role's temporary credentials expire?
+
+If a role is just a temporary hat, does the app "crash" once the timer runs
+out and the service can't authenticate anymore? No — **the hat gets swapped
+before it runs out, not just removed.** AWS refreshes the credentials
+automatically, ahead of expiry, so under normal operation this is a non-event:
+
+- **EC2:** the instance's metadata service continuously serves fresh temporary
+  credentials for the attached role. The AWS SDK's credential provider knows
+  the expiry time and fetches a new set in the background well before the old
+  ones run out — as long as the instance is running and the instance profile
+  stays attached, this refresh cycle just keeps going invisibly.
+- **Lambda (and similar managed compute like ECS tasks):** AWS injects
+  temporary credentials into each execution environment and manages renewal
+  itself, including across warm-start reuse. Nothing in your code has to
+  "renew" anything.
+
+**What actually breaks things** isn't expiry — it's someone **detaching the
+role**, **deleting it**, or **revoking/narrowing its permissions** while the
+app is running. The next API call then fails with `AccessDenied`/`403`,
+because the underlying authorization was pulled out from under a running
+service — not because credentials "timed out." Whether that "crashes" the app
+depends on error handling: a well-written service catches that and
+retries/alerts rather than dying outright.
+
+> **Real pitfall to avoid:** if code manually copies temporary credentials out
+> of the SDK (e.g. into env vars or a config file) instead of letting the
+> SDK's credential provider chain manage them, *that copy* will genuinely
+> expire and start failing — because it's been disconnected from the
+> auto-refresh mechanism. Always let the SDK fetch credentials live rather
+> than caching them yourself.
+
 ## Reading Figure 5.6
 
 ```
