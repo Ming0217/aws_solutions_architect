@@ -81,6 +81,32 @@ general mechanics (route tables, IGW, subnet associations) behind this split.
 > for admin access instead of SSH. Currently following the KodeKloud design
 > (EC2 in public subnet); revisit this as a hardening step.
 
+### Subnet CIDR plan
+
+VPC: `10.0.0.0/16`. Subnets are `/24`, so per the "frozen bits" mental model
+in [[learning-plan/04-networking/ip-addresses-and-cidr|the CIDR note]]: the
+gap between `/16` and `/24` is exactly one octet (8 bits), which means **the
+third octet is the only digit free to choose** per subnet — everything else is
+fixed by the VPC's `/16` and the subnet's own `/24` size. AWS only requires
+each subnet to fit inside `10.0.0.0/16` and not overlap another subnet;
+which third-octet value maps to which subnet is pure convention, not an AWS
+rule.
+
+Layout so far (third octet as a simple subnet index — confirmed values from
+the console shown in *italics*, rest are placeholders to fill in as the
+tutorial proceeds):
+
+| CIDR | Zone | AZ |
+| --- | --- | --- |
+| *`10.0.1.0/24`* | Public (ALB + EC2) | TBD |
+| `10.0.?.0/24` | Private (RDS) | TBD |
+
+> Only one public + one private subnet planned so far (single-AZ). Adding
+> Multi-AZ/ASG later (see the Reliability tradeoff below) will mean adding a
+> second public and private subnet in a second AZ — continuing the same
+> indexing pattern (e.g. `10.0.2.0/24` public, `10.0.4.0/24` private) once
+> those values are confirmed from the console.
+
 ### Other components
 
 - **IAM Roles** — `iam_role_ec2` and `iam_role_lambda` act as temporary
