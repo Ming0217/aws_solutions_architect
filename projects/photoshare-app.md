@@ -92,20 +92,35 @@ each subnet to fit inside `10.0.0.0/16` and not overlap another subnet;
 which third-octet value maps to which subnet is pure convention, not an AWS
 rule.
 
-Layout so far (third octet as a simple subnet index — confirmed values from
-the console shown in *italics*, rest are placeholders to fill in as the
-tutorial proceeds):
+Full layout (all 4 confirmed from the console — third octet indexes in
+creation order: main public, main private, placeholder public, placeholder
+private):
 
-| CIDR | Zone | AZ |
-| --- | --- | --- |
-| *`10.0.1.0/24`* | Public (ALB + EC2) | TBD |
-| `10.0.?.0/24` | Private (RDS) | TBD |
+| CIDR | Zone | AZ | Role |
+| --- | --- | --- | --- |
+| `10.0.1.0/24` | Public Subnet 1 | us-east-1a | Main — ALB + EC2 web server |
+| `10.0.2.0/24` | Private Subnet 1 | us-east-1a | Main — RDS |
+| `10.0.3.0/24` | Public Subnet 2 | us-east-1b | Placeholder — required for ALB creation |
+| `10.0.4.0/24` | Private Subnet 2 | us-east-1b | Placeholder — required for DB Subnet Group |
 
-> Only one public + one private subnet planned so far (single-AZ). Adding
-> Multi-AZ/ASG later (see the Reliability tradeoff below) will mean adding a
-> second public and private subnet in a second AZ — continuing the same
-> indexing pattern (e.g. `10.0.2.0/24` public, `10.0.4.0/24` private) once
-> those values are confirmed from the console.
+**Why the 2nd-AZ subnets exist already, before any resilience feature is
+turned on** — this isn't scaling yet, it's an AWS platform requirement:
+
+- **ALB requires ≥2 Availability Zones at creation.** AWS won't let you create
+  an ALB with only one subnet/AZ — its own nodes are provisioned cross-AZ for
+  the load balancer's own availability, regardless of how many/few backend
+  targets exist.
+- **RDS requires a DB Subnet Group spanning ≥2 AZs**, even for a single-AZ
+  database deployment. This reserves room for a standby (if Multi-AZ is
+  enabled later) or for maintenance failover, without needing to re-architect
+  the network afterward.
+
+So `Public Subnet 2` / `Private Subnet 2` hold **no live resources yet** — no
+second EC2, no DB standby. They exist purely to satisfy ALB/DB-Subnet-Group
+validation. They become "real" exactly when an ASG places a second EC2 in
+`10.0.3.0/24`, or RDS Multi-AZ places a standby in `10.0.4.0/24` — see the
+Reliability tradeoff below, which is about turning those features *on*, not
+about creating new subnets (the network is already in place for it).
 
 ### Other components
 
@@ -135,11 +150,14 @@ tutorial proceeds):
 - **Security:** private RDS with no public access, Secrets Manager + KMS for
   credentials, S3 public access fully blocked, IAM roles instead of hardcoded
   keys — no static credentials anywhere in the stack.
-- **Reliability:** *not yet addressed* — currently a single EC2 instance
+- **Reliability:** *not yet addressed* — the network is already provisioned
+  across 2 AZs (subnets in us-east-1a and us-east-1b, see Subnet CIDR plan
+  above), but nothing actually uses the second AZ yet: single EC2 instance
   behind the ALB, no Auto Scaling Group, no Multi-AZ RDS. This is the known
   gap against the OKR's KR2 "failure handling" requirement. Planned next step:
   add an ASG (see [[learning-plan/04-networking/load-balancers|ALB + ASG
-  pattern]]) and enable RDS Multi-AZ.
+  pattern]]) and enable RDS Multi-AZ — turning on features the network
+  already has room for, not re-architecting subnets.
 - **Scalability:** Lambda handles image-processing burst load automatically
   (serverless, scales with S3 upload events); EC2/ALB scaling not yet in place
   (depends on the ASG addition above).
