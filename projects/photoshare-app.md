@@ -295,11 +295,72 @@ background. **Advanced Settings → Enable VPC: left unchecked.**
 
 ## Build log / steps
 
-1.
+Built end-to-end through the AWS console (no IaC yet):
+
+1. **VPC & networking** — `photoshare-vpc` (`10.0.0.0/16`), 4 subnets across
+   2 AZs (`10.0.1.0/24`–`10.0.4.0/24`), Internet Gateway, and route tables
+   (public subnets routed to the IGW, private subnets isolated). See Subnet
+   CIDR plan above.
+2. **IAM roles** — `iam_role_ec2` (EC2 trust, `AmazonS3FullAccess` +
+   `AWSSecretsManagerClientReadOnlyAccess`) and `iam_role_lambda` (Lambda
+   trust; exact attached policies still **TBD/unconfirmed** — see the "can't
+   find Lambda in CloudWatch" gotcha below, which depends on whether
+   `AWSLambdaBasicExecutionRole` is actually attached).
+3. **KMS** — used the AWS-managed `alias/aws/secretsmanager` key (no
+   customer managed key needed for this pass).
+4. **RDS** — MySQL instance in the private subnet (DB Subnet Group across
+   both AZs), Public Access disabled, `db-sg` allowing port 3306 from
+   `10.0.0.0/16` (known hardening gap — see tradeoffs below).
+5. **Secrets Manager** — DB credentials stored and retrieved by the EC2 app
+   at runtime via `iam_role_ec2`.
+6. **S3** — image bucket created with Block All Public Access enabled.
+7. **EC2** — web server launched in the public subnet, running the app via
+   Docker Compose.
+8. **Lambda** — image-metadata function deployed with **no VPC attachment**
+   (relies on default internet access to reach S3 and the ALB — see Lambda
+   subsection above).
+9. **ALB** — `photoshare-alb-1992972335.us-east-1.elb.amazonaws.com`,
+   internet-facing, routing to the EC2 target group.
+10. **CloudWatch** — dashboard covering EC2 CPU and Lambda errors.
+
+Console build completed 2026-07-04. Resilience hardening (ASG, RDS Multi-AZ)
+not yet done — see Next steps below.
 
 ## Gotchas & troubleshooting
 
--
+- **Target group stuck in `unused`:** caused by the EC2 instance sitting in
+  an AZ (`us-east-1d`) the ALB had no subnet in. Fixed by launching the
+  instance in one of the ALB's actual AZs (`us-east-1a`/`us-east-1b`) instead
+  of adding a new ALB subnet.
+- **Can't find Lambda in CloudWatch:** Lambda only creates its log group and
+  starts emitting metrics after its **first invocation** — nothing shows up
+  until the function is actually triggered (test event or real S3 upload).
+  Also confirm `iam_role_lambda` has `AWSLambdaBasicExecutionRole` attached,
+  or logs will silently never appear even after invocation.
+- **`db-sg` inbound rule uses `10.0.0.0/16` (entire VPC) as the source**,
+  not the EC2 security group specifically — broader than the "only EC2 can
+  reach it" goal implies. Tutorial simplification (avoids a dependency-order
+  problem, since `db-sg` may be created before the EC2 security group
+  exists); flagged as a hardening item, not yet fixed.
+
+## Next steps
+
+Console build ("Mission Accomplished" per the tutorial) is functionally
+complete, but not yet OKR-complete. Mapped against the H2 2026 OKR:
+
+1. **Add an ASG + enable RDS Multi-AZ** (tutorial's own "Auto Scaling" next
+   step) — closes the Reliability gap, the one item blocking this project
+   from satisfying KR2's "failure handling" requirement.
+2. **Finish the Well-Architected review table** — only Security and
+   Reliability have findings; still need Operational Excellence, Performance
+   Efficiency, Cost Optimization, and Sustainability passes (KR3).
+3. **Write the final Walkthrough summary** below once step 1 is done (KR4).
+4. **Fix the `db-sg` broad-source hardening item** (see Gotchas above) while
+   doing the Security pillar review.
+
+Tutorial also suggests CloudFormation/IaC and Route 53 + ACM (domain/HTTPS) —
+good polish, but not required by any of the 4 KRs; treat as optional
+follow-on rather than blockers.
 
 ## Cleanup
 
@@ -307,13 +368,14 @@ background. **Advanced Settings → Enable VPC: left unchecked.**
 
 ## Walkthrough summary
 
-*Draft — fill in once the build is functional.*
+*Draft — fill in once resilience (ASG + Multi-AZ) is added; see Next steps.*
 
 PhotoShare separates public-facing compute (ALB + EC2) from private data (RDS)
 using VPC subnetting, removes all static credentials via IAM roles + Secrets
-Manager + KMS, and offloads image processing to Lambda triggered by S3 events.
-Known gap: no resilience story yet for EC2/RDS failure (single instance, no
-Multi-AZ) — to be addressed before considering this complete against the OKR.
+Manager + KMS, and offloads image processing to Lambda triggered by S3 events
+(with no VPC attachment, relying on default internet access). Known gap: no
+resilience story yet for EC2/RDS failure (single instance, no Multi-AZ) — to
+be addressed before considering this complete against the OKR.
 
 ## Takeaways
 
