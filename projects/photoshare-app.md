@@ -130,10 +130,30 @@ own IAM role — temporary ID badges granting only the permissions each worker
 needs. See [[learning-plan/06-security-iam/iam-users-groups-roles-policies|the
 IAM note]] for the general "how a role gets associated" mechanics.
 
-| Role | Trusted service (trust policy) | How it's attached |
-| --- | --- | --- |
-| `iam_role_ec2` | `ec2.amazonaws.com` | Wrapped in an **instance profile**, attached to the EC2 instance |
-| `iam_role_lambda` | `lambda.amazonaws.com` | Set directly as the function's **execution role** — no instance-profile-equivalent needed |
+| Role | Trusted service (trust policy) | How it's attached | Attached policies |
+| --- | --- | --- | --- |
+| `iam_role_ec2` | `ec2.amazonaws.com` | Wrapped in an **instance profile**, attached to the EC2 instance | `AmazonS3FullAccess`, `AWSSecretsManagerClientReadOnlyAccess` |
+| `iam_role_lambda` | `lambda.amazonaws.com` | Set directly as the function's **execution role** — no instance-profile-equivalent needed | TBD |
+
+**Why EC2 needs those two specific policies — two unrelated jobs:**
+
+- **`AmazonS3FullAccess`** — the web server uploads/serves photos to the S3
+  bucket. Nothing to do with the database.
+- **`AWSSecretsManagerClientReadOnlyAccess`** — lets EC2 call
+  `secretsmanager:GetSecretValue` to fetch the DB password at runtime instead
+  of hardcoding it. See [[learning-plan/06-security-iam/secrets-manager|the
+  Secrets Manager note]] for the full IAM→Secrets-Manager→KMS chain.
+
+> **Important nuance:** this Secrets Manager permission does **not** grant
+> access to RDS itself — it only grants access to *read the secret*. Actual
+> database access is a separate layer: **network** access is controlled by
+> the private subnet + security group (only the EC2 security group allowed in
+> on the DB port), and **authentication** to MySQL uses the master
+> username/password itself (a database-native credential, per
+> [[learning-plan/05-databases/rds-core-concepts|the RDS note]]) — not IAM at
+> all. Without the Secrets Manager permission, EC2 could still be
+> network-reachable to RDS but would never learn the password to log in — so
+> the app effectively couldn't connect.
 
 > **Naming constraint:** role names must start with `iam` and contain `role`
 > (satisfied by both names above). This is a **lab guardrail, not an AWS
