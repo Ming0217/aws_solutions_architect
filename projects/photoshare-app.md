@@ -343,6 +343,39 @@ not yet done — see Next steps below.
   problem, since `db-sg` may be created before the EC2 security group
   exists); flagged as a hardening item, not yet fixed.
 
+## Verifying the app — inspecting RDS data
+
+RDS is private with no public access, so you can't connect from a laptop
+directly — you must go **through the EC2 instance**, the only thing `db-sg`
+allows in.
+
+**Option A — simplest, from the EC2 instance directly:**
+
+1. Connect to EC2 via **Session Manager** (console → EC2 → instance →
+   Connect → Session Manager tab — no SSH, no public IP needed, per
+   [[learning-plan/02-compute/connecting-to-ec2-ssm-eic|the SSM note]]).
+2. From that shell: `mysql -h <rds-endpoint> -u <username> -p <database-name>`
+   — get the endpoint from RDS console → Connectivity & security, and
+   credentials from Secrets Manager (`aws secretsmanager get-secret-value
+   --secret-id <secret-name>`) if not the master ones.
+3. Once connected: `SHOW TABLES;` then `SELECT * FROM <table_name>;`.
+   (If the app runs in Docker, may need `docker exec -it <container> mysql
+   ...` instead, depending on whether the client is on the host or in the
+   container.)
+
+**Option B — nicer, GUI client (MySQL Workbench, DBeaver, TablePlus) from a
+laptop, tunneled through EC2 via SSM port forwarding** (same zero-inbound-ports
+principle as Session Manager — no SSH, no opened ports):
+
+```
+aws ssm start-session \
+  --target <ec2-instance-id> \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["<rds-endpoint>"],"portNumber":["3306"],"localPortNumber":["3306"]}'
+```
+
+Then point the GUI client at `localhost:3306` with the same DB credentials.
+
 ## Next steps
 
 Console build ("Mission Accomplished" per the tutorial) is functionally
