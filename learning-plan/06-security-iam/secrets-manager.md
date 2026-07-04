@@ -48,6 +48,25 @@ Same two-gate pattern as SSE-KMS: `secretsmanager:GetSecretValue` **and**
 `kms:Decrypt` both have to be allowed — access control (IAM) and encryption
 (KMS) are separate layers working together, not one substituting for the other.
 
+> **Correction/nuance:** both checks always happen, but *where* the second one
+> lives depends on who owns the key:
+>
+> - **AWS-managed key (`aws/secretsmanager`):** its key policy already grants
+>   decrypt access to **any principal in the account**, as long as they call
+>   through the Secrets Manager service (a `kms:ViaService` condition on the
+>   key's own resource policy). So the caller's IAM role only needs
+>   `secretsmanager:GetSecretValue` — **no separate `kms:Decrypt` needed** on
+>   the caller's own policy.
+> - **Customer managed key:** you must explicitly grant `kms:Decrypt` to the
+>   calling role — either in the role's IAM policy or by naming the role
+>   directly in the key's policy — since there's no built-in account-wide
+>   grant like the AWS-managed key has.
+>
+> So "the caller needs both permissions" is only strictly true for customer
+> managed keys. With the default AWS-managed key, seeing an IAM role with only
+> `secretsmanager:GetSecretValue` (and no KMS permission at all) still working
+> is expected, not a gap.
+
 ## Key Benefits
 
 - **Secrets are encrypted at rest using KMS.**

@@ -164,13 +164,61 @@ IAM note]] for the general "how a role gets associated" mechanics.
 > restriction: the lab scopes down what *you* can create, not what AWS itself
 > demands.
 
+### KMS
+
+Using the **AWS-managed key**, alias `alias/aws/secretsmanager` (Key ARN:
+*TBD — record from KMS console*), to encrypt the database credentials stored
+in Secrets Manager. Data appears as scrambled gibberish even if the encrypted
+value is accessed directly, without the key. See
+[[learning-plan/06-security-iam/kms-key-management-service|the KMS note]].
+
+> **Why `iam_role_ec2` doesn't need an explicit `kms:Decrypt` permission:**
+> reading a KMS-encrypted secret always requires two authorization checks —
+> `secretsmanager:GetSecretValue` **and** `kms:Decrypt` — but *where* the
+> second check lives depends on who owns the key:
+>
+> - **AWS-managed key (this project's setup):** the key's own key policy
+>   already grants decrypt access to **any principal in the account**, as long
+>   as they call through the Secrets Manager service (a `kms:ViaService`
+>   condition on the key's resource policy). So `iam_role_ec2` only needs
+>   `AmazonS3FullAccess` + `AWSSecretsManagerClientReadOnlyAccess` — no
+>   separate KMS permission — and it still works. This is expected, not a gap.
+> - **Customer managed key (the one built in the earlier KMS lab):** would
+>   require explicitly granting `kms:Decrypt` to `iam_role_ec2`, either in the
+>   role's IAM policy or by naming the role directly in the key's policy.
+>
+> Both checks always happen — only the *location* of the second one changes
+> depending on key ownership.
+
+### RDS
+
+Every photo needs data attached to it — who uploaded it, when, and its title.
+Amazon RDS runs a managed **MySQL** database for this, placed in the
+**Private Subnet** so it's invisible to the public internet, and only the
+Web Server (EC2) can talk to it. See
+[[learning-plan/05-databases/rds-core-concepts|the RDS note]] for the general
+DB-instance/engine/Multi-AZ mechanics.
+
+**How "only EC2 can talk to it" is actually enforced — three independent
+layers, each blocking a different attack path:**
+
+1. **No route to an Internet Gateway** (private subnet) — nothing on the
+   internet can even attempt a connection.
+2. **RDS "Public Access" disabled** — a second, RDS-specific switch, separate
+   from subnet routing.
+3. **Security group referencing the EC2 security group as the source** (not a
+   CIDR range) — even *inside* the VPC, only instances wearing the web
+   server's security group can reach the DB port. This is stronger than "same
+   subnet," since subnet membership alone doesn't imply permission — another
+   instance in the same private subnet with a different security group would
+   still be blocked.
+
+Only after all three checks pass does a connection even get the chance to
+authenticate with the MySQL master username/password (a database-native
+credential, separate from all of the above).
+
 ### Other components
 
-- **KMS** — AWS-managed key encrypts secrets; data appears as scrambled
-  gibberish even if accessed directly. See
-  [[learning-plan/06-security-iam/kms-key-management-service|KMS note]].
-- **RDS** — MySQL in the private subnet, Public Access disabled; only EC2 can
-  reach it. See [[learning-plan/05-databases/rds-core-concepts|RDS note]].
 - **Secrets Manager** — DB password stored securely, retrieved at runtime;
   never in source code. See
   [[learning-plan/06-security-iam/secrets-manager|Secrets Manager note]].
