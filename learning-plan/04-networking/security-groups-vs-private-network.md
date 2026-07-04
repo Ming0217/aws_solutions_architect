@@ -65,6 +65,25 @@ you own the **rules** (security *in* the cloud). Analogy: AWS provides and staff
 A **rule** specifies: **protocol** (TCP/UDP) + **port** (e.g. 443) + **source** (inbound)
 or **destination** (outbound — an IP range or another security group).
 
+### One resource, two console entry points
+
+Security groups show up under **both** the EC2 console (Network & Security →
+Security Groups) **and** the VPC console (Security → Security Groups) — this
+is not two different features, just one resource type surfaced twice.
+
+- Technically, a security group is part of the **EC2 API**
+  (`ec2:CreateSecurityGroup`, `ec2:AuthorizeSecurityGroupIngress`, etc.) — a
+  holdover from before VPC existed (the old "EC2-Classic" era, when instances
+  didn't live in a VPC at all). When VPC came along, security groups became
+  **VPC-scoped** (each belongs to exactly one VPC), but the API kept living
+  under the EC2 namespace.
+- Create/edit one from either console screen and it shows up identically in
+  the other — same object, same rules, just a UX convenience since managing
+  security groups is fundamentally a networking task.
+- Same pattern applies to a couple of other resources: **Elastic IPs** and
+  **Network Interfaces (ENIs)** also appear in both the EC2 and VPC consoles
+  for the same historical reason.
+
 ### The two defaults (asymmetric on purpose)
 
 1. **Inbound = deny by default.** A new security group has *zero* inbound rules — nothing
