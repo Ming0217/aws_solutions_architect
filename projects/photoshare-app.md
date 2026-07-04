@@ -122,11 +122,30 @@ validation. They become "real" exactly when an ASG places a second EC2 in
 Reliability tradeoff below, which is about turning those features *on*, not
 about creating new subnets (the network is already in place for it).
 
+### IAM Roles
+
+Two workers need AWS access: the **Web Server (EC2)** and the **Image
+Processing Function (Lambda)**. Instead of hardcoding API keys, each gets its
+own IAM role — temporary ID badges granting only the permissions each worker
+needs. See [[learning-plan/06-security-iam/iam-users-groups-roles-policies|the
+IAM note]] for the general "how a role gets associated" mechanics.
+
+| Role | Trusted service (trust policy) | How it's attached |
+| --- | --- | --- |
+| `iam_role_ec2` | `ec2.amazonaws.com` | Wrapped in an **instance profile**, attached to the EC2 instance |
+| `iam_role_lambda` | `lambda.amazonaws.com` | Set directly as the function's **execution role** — no instance-profile-equivalent needed |
+
+> **Naming constraint:** role names must start with `iam` and contain `role`
+> (satisfied by both names above). This is a **lab guardrail, not an AWS
+> requirement** — restricted labs commonly enforce this via an IAM policy
+> condition on the student's own permissions (e.g. `iam:CreateRole` allowed
+> only when the role name matches a `StringLike` pattern like `iam_role_*`).
+> Same mechanism as the KMS lab's "Default Policy trusts the Root Account"
+> restriction: the lab scopes down what *you* can create, not what AWS itself
+> demands.
+
 ### Other components
 
-- **IAM Roles** — `iam_role_ec2` and `iam_role_lambda` act as temporary
-  security badges (assumed roles, no hardcoded API keys). See
-  [[learning-plan/06-security-iam/iam-users-groups-roles-policies|IAM note]].
 - **KMS** — AWS-managed key encrypts secrets; data appears as scrambled
   gibberish even if accessed directly. See
   [[learning-plan/06-security-iam/kms-key-management-service|KMS note]].
