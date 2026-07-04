@@ -218,6 +218,38 @@ Only after all three checks pass does a connection even get the chance to
 authenticate with the MySQL master username/password (a database-native
 credential, separate from all of the above).
 
+### Lambda — networking decision (no VPC)
+
+Triggers automatically on S3 upload to process image metadata in the
+background. **Advanced Settings → Enable VPC: left unchecked.**
+
+- **Why this works:** Lambda's default (no-VPC) networking already has **full
+  internet access built in**, managed by AWS — it's not attached to
+  PhotoShare's VPC at all, so it's never subject to that VPC's routing rules
+  (no IGW, no NAT, no private-subnet restrictions apply to it). If it *were*
+  placed inside the private subnet instead, it would be bound by that
+  subnet's route table — and since there's no NAT Gateway there, it would
+  lose all internet access entirely.
+- **Why it needs to reach S3:** to read the uploaded image / write processed
+  metadata back.
+- **Why it needs to reach the ALB** (`photoshare-alb-1992972335.us-east-1.elb.amazonaws.com`):
+  the ALB has private IPs inside the VPC too, but since Lambda isn't attached
+  to the VPC, its only path to it is via its public, internet-facing DNS
+  name. This strongly implies the design is: **Lambda processes metadata, then
+  calls back into the web app's own API (through the ALB)**, letting the
+  *web app* write the metadata into RDS — rather than giving Lambda direct
+  database access. That keeps `iam_role_lambda`'s permissions minimal (S3 +
+  outbound HTTP only, no Secrets Manager/RDS access needed) — least privilege
+  by architecture, not just by policy.
+
+> **Contrast — the trade-off this avoids:** if Lambda needed to write
+> directly to RDS instead, it would have to be attached to the VPC to reach
+> the private subnet — and then it would need its own internet story: either
+> a **NAT Gateway** (general internet-bound traffic, e.g. reaching S3's public
+> endpoint) or an **S3 VPC Endpoint** (lets VPC-attached resources reach S3
+> without any internet route at all). "Lambda in a VPC needs its own
+> connectivity plan" is a common gotcha this design sidesteps entirely.
+
 ### Other components
 
 - **Secrets Manager** — DB password stored securely, retrieved at runtime;
@@ -226,11 +258,9 @@ credential, separate from all of the above).
 - **S3** — image bucket with "Block All Public Access" enabled; photos served
   through the app, never directly from the bucket.
 - **EC2** — web server running Docker; the app's compute core.
-- **Lambda** — triggers automatically on S3 upload to process image metadata
-  in the background.
-- **ALB** — secure entry point, routes internet traffic to EC2, shields
-  infrastructure from direct exposure. See
-  [[learning-plan/04-networking/load-balancers|Load balancers note]].
+- **ALB** — secure entry point (`photoshare-alb-1992972335.us-east-1.elb.amazonaws.com`),
+  routes internet traffic to EC2, shields infrastructure from direct exposure.
+  See [[learning-plan/04-networking/load-balancers|Load balancers note]].
 - **CloudWatch** — dashboard for CPU usage and Lambda errors, with alerts.
 
 ## Design decisions & tradeoffs
