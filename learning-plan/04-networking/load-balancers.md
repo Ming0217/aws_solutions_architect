@@ -18,6 +18,21 @@ tags:
 > Related: [[learning-plan/10-architecting/stateless-compute-shared-state|Stateless Compute + Shared State]]
 > · [[learning-plan/02-compute/apache-web-server|Apache Web Server]]
 
+## Quick recap: why & how
+
+**Why does ALB exist?**
+
+- Prevents one server from being overloaded.
+- Keeps the app running even if one server fails.
+- Gives you one stable address (DNS name) for your app.
+
+**How does it work?**
+
+1. A user opens a website in a browser.
+2. The request goes to the ALB.
+3. The ALB sends the request to a healthy EC2 server.
+4. The EC2 server responds with the web page.
+
 ## Is it built on open-source tech?
 
 Not the way RDS/EFS are. A pattern in AWS is managed wrappers around open-source tech
@@ -105,6 +120,10 @@ hide behind it.
 
 ## How a load balancer works
 
+> **TL;DR:** the load balancer is the front door of your application. Users don't talk to
+> your servers directly — they talk to the load balancer, and it decides which server
+> handles the request.
+
 Core job: sit in front of multiple backend servers and spread requests across them, so no
 single server is overwhelmed and the system survives individual failures.
 
@@ -142,6 +161,32 @@ Zones, so it's not a single point of failure.
 > inspecting content, it doesn't need to understand the protocol. Rule: content-aware
 > routing → **Layer 7 (ALB, HTTP only)**; spread any TCP protocol at high speed →
 > **Layer 4 (NLB)**.
+
+## Target Groups
+
+The **target group** is the actual list of backends the ALB is allowed to send traffic to
+— the ALB itself never talks to a hardcoded server list, only to a target group.
+
+- **Listener → rule → target group.** A **listener** watches a port/protocol (e.g. HTTPS on
+  443). Attached to it are **rules** ("if path starts with `/api/*`, send here"); each rule
+  points at a **target group**. This is what makes **path-based routing** possible — one
+  ALB, multiple target groups, one per backend service (e.g. `/api/*` → API servers,
+  `/images/*` → image servers).
+- **Target type — what's actually in the group:**
+  - **Instance** — EC2 instances, referenced by instance ID. Most common for the
+    ASG-backed pattern below.
+  - **IP address** — any routable IP (on-prem servers, containers, another VPC). Useful
+    when the target isn't a "real" EC2 instance ALB can look up by ID.
+  - **Lambda** — a single function, invoked instead of forwarded to a server. Turns the ALB
+    into an HTTP front door for serverless code, no EC2 involved at all.
+- **Health checks live on the target group, not the ALB globally.** Each target group
+  defines its own health check (path, interval, thresholds). This means different backend
+  services behind the same ALB can have independent health-check rules — the `/api/*`
+  target group and the `/images/*` target group don't have to agree on what "healthy" means.
+- **Registration is what "auto-registers" (from the ASG section below) actually means:**
+  an instance being "in" a target group is just an entry in that group's member list. The
+  ASG adds/removes entries as it launches/terminates instances — nothing about the ALB
+  itself changes.
 
 ## ALB + Auto Scaling Group (the core reliability pattern)
 
