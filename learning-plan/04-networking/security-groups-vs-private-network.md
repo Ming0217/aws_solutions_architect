@@ -29,6 +29,29 @@ layers**:
 > One-liner: #3 guards the **door** (which ports are open); #4 decides whether there's
 > even a **road** to the building (does a network path exist at all).
 
+## Mental model: "Is there a road? → Is the door unlocked?"
+
+Ask these two questions, always in this order:
+
+1. **Is there a road?** (VPC / Subnet / Route Table) — does a network path even
+   exist between A and B? If no (e.g. a private subnet with no route to an
+   Internet Gateway), **nothing else matters** — the security group is never
+   even consulted, because traffic never arrives.
+2. **Is the door unlocked?** (Security Group) — *only relevant once a road
+   exists.* Given that traffic *can* physically arrive, is this specific
+   port/protocol/source actually allowed through?
+
+**Why the order matters for troubleshooting:** check the road first, then the
+door. A target stuck reachable-but-failing is often a pure **road** problem
+(wrong AZ, missing route) where the security group was never the issue; a
+connection that reaches the instance but gets refused is a pure **door**
+problem.
+
+**The road is a hard backstop; the door is just a rule.** If someone
+misconfigures a security group too permissively, the *absence of a road*
+(private subnet, no IGW route) still protects you. A door can be
+misconfigured by mistake; a road that doesn't exist can't be.
+
 ## #3 — Security Groups (instance-level firewall)
 
 A security group attaches to an instance's network interface and decides which **ports /
