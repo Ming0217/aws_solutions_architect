@@ -166,8 +166,9 @@ IAM note]] for the general "how a role gets associated" mechanics.
 
 ### KMS
 
-Using the **AWS-managed key**, alias `alias/aws/secretsmanager` (Key ARN:
-*TBD — record from KMS console*), to encrypt the database credentials stored
+Using the **AWS-managed key**, alias `alias/aws/secretsmanager`
+(Key ARN: `arn:aws:kms:us-east-1:058264141167:key/54168bcb-db5a-4c36-b718-6eb3bbcfc03c`),
+to encrypt the database credentials stored
 in Secrets Manager. Data appears as scrambled gibberish even if the encrypted
 value is accessed directly, without the key. See
 [[learning-plan/06-security-iam/kms-key-management-service|the KMS note]].
