@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhotoShare</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --band: #f5f5f7;
+      --text: #1d1d1f;
+      --text-2: #6e6e73;
+      --line: rgba(0,0,0,0.08);
+      --blue: #0071e3;
+      --blue-hover: #0077ed;
+      --green: #34c759;
+      --orange: #ff9f0a;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --grad: linear-gradient(92deg, #ff5e3a 0%, #ff2d78 45%, #b829e0 100%);
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 10px 30px rgba(0,0,0,0.10);
+      --shadow-lg: 0 30px 60px rgba(0,0,0,0.18);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text); font-family: var(--font);
+      -webkit-font-smoothing: antialiased; line-height: 1.5;
+    }
+
+    /* Header */
+    header {
+      height: 52px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 22px; position: sticky; top: 0; z-index: 20;
+      background: rgba(255,255,255,0.72); backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+    .conn { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #c7c7cc; flex: none; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 80px 22px 40px; max-width: 980px; margin: 0 auto; }
+    .eyebrow { font-size: 15px; font-weight: 600; color: var(--text-2); letter-spacing: 0.01em; margin-bottom: 14px; }
+    .hero h1 {
+      font-size: clamp(40px, 7vw, 76px); font-weight: 700; line-height: 1.05;
+      letter-spacing: -0.03em; margin: 0 0 20px;
+    }
+    .hero h1 .grad {
+      background: var(--grad); -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .hero .sub {
+      font-size: clamp(18px, 2.4vw, 23px); color: var(--text-2); font-weight: 400;
+      max-width: 640px; margin: 0 auto 30px; letter-spacing: -0.01em;
+    }
+    .cta { display: flex; gap: 16px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--blue); color: #fff; border: none; font-family: var(--font);
+      font-size: 17px; font-weight: 400; padding: 12px 24px; border-radius: 980px;
+      cursor: pointer; transition: background-color .2s;
+    }
+    .btn-primary:hover { background: var(--blue-hover); }
+    .link-cta {
+      color: var(--blue); font-size: 17px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .link-cta:hover { text-decoration: underline; }
+
+    /* Hero visual: stacked photo cards */
+    .hero-visual { position: relative; height: 380px; margin: 30px auto 0; max-width: 560px; }
+    .pcard {
+      position: absolute; width: 200px; height: 300px; border-radius: 26px; top: 40px; left: 50%;
+      margin-left: -100px; box-shadow: var(--shadow-lg); overflow: hidden;
+      border: 5px solid #fff;
+    }
+    .pcard.left  { transform: translateX(-120px) rotate(-9deg); z-index: 1; }
+    .pcard.right { transform: translateX(120px) rotate(9deg); z-index: 1; }
+    .pcard.center { z-index: 3; width: 220px; height: 330px; margin-left: -110px; top: 20px; }
+    .pc1 { background: linear-gradient(150deg, #7afcff, #ff6ac1); }
+    .pc2 { background: linear-gradient(150deg, #ffd36e, #ff6a3d 55%, #ff2d78); }
+    .pc3 { background: linear-gradient(150deg, #c86dd7, #3023ae); }
+    .badge {
+      position: absolute; z-index: 5; display: inline-flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow-md);
+    }
+    .badge.heart { left: 120px; top: 210px; width: 54px; height: 54px; border-radius: 16px; background: #fff; }
+    .badge.heart svg { width: 30px; height: 30px; }
+    .badge.star { right: 120px; top: 70px; height: 30px; padding: 0 12px; gap: 6px; border-radius: 980px; background: var(--green); color: #fff; font-size: 13px; font-weight: 600; }
+    .badge.avatar { right: 150px; top: 250px; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg,#f9ce34,#ee2a7b,#6228d7); border: 3px solid #fff; }
+
+    /* Features */
+    .features {
+      background: var(--band); padding: 72px 22px; margin-top: 30px;
+    }
+    .features-inner { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+    .feature { text-align: center; }
+    .feature .ic {
+      width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center; background: #fff; box-shadow: var(--shadow-sm);
+    }
+    .feature .ic svg { width: 30px; height: 30px; }
+    .feature h3 { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 6px; }
+    .feature p { font-size: 15px; color: var(--text-2); margin: 0; }
+
+    /* App section */
+    main { max-width: 980px; margin: 0 auto; padding: 64px 22px 80px; }
+    .section-title { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; text-align: center; margin: 0 0 8px; }
+    .section-sub { text-align: center; color: var(--text-2); font-size: 17px; margin: 0 0 32px; }
+
+    .banner {
+      display: none; align-items: center; gap: 10px; justify-content: center;
+      background: #fff; box-shadow: var(--shadow-sm); border-radius: 14px;
+      padding: 12px 18px; font-size: 14px; color: var(--text-2); margin-bottom: 28px;
+    }
+
+    .panel {
+      background: #fff; box-shadow: var(--shadow-sm); border: 1px solid var(--line); border-radius: 20px;
+      padding: 22px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 40px;
+    }
+    input[type=text] {
+      flex: 1; min-width: 200px; height: 44px; padding: 0 16px; border: 1px solid var(--line);
+      background: #fff; color: var(--text); border-radius: 12px; font-family: var(--font); font-size: 15px; outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input[type=text]::placeholder { color: #a1a1a6; }
+    input[type=text]:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,113,227,0.15); }
+    .file-label {
+      height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 18px;
+      background: var(--band); color: var(--text); border-radius: 12px; font-size: 15px; cursor: pointer;
+      transition: background-color .15s;
+    }
+    .file-label:hover { background: #ececee; }
+    .file-label svg { width: 18px; height: 18px; }
+    .file-name { font-size: 13px; color: #a1a1a6; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    input[type=file] { display: none; }
+    .btn {
+      height: 44px; padding: 0 22px; border: none; border-radius: 12px; background: var(--blue); color: #fff;
+      font-family: var(--font); font-size: 15px; font-weight: 500; cursor: pointer; transition: background-color .15s;
+    }
+    .btn:hover { background: var(--blue-hover); }
+    .btn:disabled { background: #a1a1a6; cursor: default; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+    .card { background: #fff; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-sm); transition: transform .2s, box-shadow .2s; }
+    .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+    .card .thumb { aspect-ratio: 4/3; width: 100%; object-fit: cover; background: var(--band); display: block; }
+    .card .meta { padding: 14px 16px; }
+    .card .title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 8px; }
+    .card .info { font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .card .stat { display: inline-flex; align-items: center; gap: 6px; }
+    .card .sdot { width: 9px; height: 9px; border-radius: 50%; }
+    .empty { color: #a1a1a6; text-align: center; padding: 60px 0; font-size: 15px; }
+    footer { text-align: center; color: #a1a1a6; font-size: 12px; padding: 30px; border-top: 1px solid var(--line); }
+
+    @media (max-width: 720px) {
+      .features-inner { grid-template-columns: 1fr; gap: 36px; }
+      .hero-visual { transform: scale(0.85); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">PhotoShare</div>
+    <div class="conn"><span class="dot" id="connDot"></span><span id="conn">connecting</span></div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow">PhotoShare</div>
+    <h1>Every moment,<br /><span class="grad">worth sharing.</span></h1>
+    <p class="sub">Upload, store, and relive your favorite photos — fast, secure, and effortlessly organized in the cloud.</p>
+    <div class="cta">
+      <button class="btn-primary" onclick="document.getElementById('upload').scrollIntoView()">Upload a photo</button>
+      <a class="link-cta" href="#gallery">View gallery ›</a>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="pcard left pc1"></div>
+      <div class="pcard right pc3"></div>
+      <div class="pcard center pc2"></div>
+      <div class="badge heart">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5e3a"/><stop offset="1" stop-color="#ff2d78"/></linearGradient></defs><path d="M12 21s-7-4.5-9.5-9C.8 8.5 2.5 5 6 5c2 0 3.2 1.2 4 2.3C10.8 6.2 12 5 14 5c3.5 0 5.2 3.5 3.5 7-2.5 4.5-9.5 9-9.5 9z" fill="url(#h)"/></svg>
+      </div>
+      <div class="badge star"><svg viewBox="0 0 24 24" width="14" height="14" fill="#fff"><path d="M12 2l2.9 6.2 6.8.6-5.1 4.5 1.5 6.7L12 17l-6 3.5 1.5-6.7L2.3 8.8l6.8-.6z"/></svg>Close</div>
+      <div class="badge avatar"></div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features">
+    <div class="features-inner">
+      <div class="feature">
+        <div class="ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7 9m5-5l5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        </div>
+        <h3>Instant uploads</h3>
+        <p>Drop a photo and it's live in seconds, straight to durable cloud storage.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h3>Secure by design</h3>
+        <p>Photos live in a private bucket — no public access, credentials never exposed.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#ff2d78" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m13.5-6.5l-2 2m-7 7l-2 2m11 0l-2-2m-7-7l-2-2"/></svg>
+        </div>
+        <h3>Auto-processed</h3>
+        <p>Every upload is analyzed in the background — dimensions and details, handled.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- APP -->
+  <main>
+    <h2 class="section-title" id="upload">Your library</h2>
+    <p class="section-sub">Upload a new photo or browse everything you've shared.</p>
+
+    <div class="banner" id="banner">
+      <span class="dot" style="background:var(--orange)"></span>
+      <span>Preview mode — no API connected. Showing sample tiles so you can see the layout.</span>
+    </div>
+
+    <form class="panel" id="uploadForm">
+      <input type="text" id="title" placeholder="Photo title (optional)" />
+      <label class="file-label" for="file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7 9m5-5l5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Choose image
+      </label>
+      <span class="file-name" id="fileName">no file selected</span>
+      <input type="file" id="file" accept="image/*" required />
+      <button class="btn" type="submit" id="uploadBtn">Upload</button>
+    </form>
+
+    <div id="gallery">
+      <div class="grid" id="grid"></div>
+      <div class="empty" id="empty" style="display:none">No photos yet — upload one above.</div>
+    </div>
+  </main>
+
+  <footer>PhotoShare · running on AWS (VPC · ALB · EC2 · RDS · S3 · Lambda)</footer>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+    const banner = document.getElementById('banner');
+    const conn = document.getElementById('conn');
+    const connDot = document.getElementById('connDot');
+
+    function fmtSize(b) {
+      if (!b) return '—';
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b / 1024).toFixed(0) + ' KB';
+      return (b / 1048576).toFixed(1) + ' MB';
+    }
+
+    function card(p, previewSrc) {
+      const src = previewSrc || ('/photos/' + p.id + '/image');
+      const dims = (p.width && p.height) ? (p.width + '×' + p.height) : '—';
+      const dotColor = p.status === 'processed' ? 'var(--green)' : 'var(--orange)';
+      return `<div class="card">
+        <img class="thumb" src="${src}" alt="${p.title || 'photo'}" loading="lazy" />
+        <div class="meta">
+          <div class="title">${p.title || 'Untitled'}</div>
+          <div class="info">
+            <span class="stat"><span class="sdot" style="background:${dotColor}"></span>${p.status || 'uploaded'}</span>
+            <span class="stat">${dims}</span>
+            <span class="stat">${fmtSize(p.size_bytes)}</span>
+          </div>
+        </div></div>`;
+    }
+
+    function demoTile(g, label) {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300'>
+        <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>${g}</linearGradient></defs>
+        <rect width='100%' height='100%' fill='url(#g)'/></svg>`;
+      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    const demo = [
+      { id:1, title:'Sunset over the bay', width:1920, height:1280, size_bytes:842000, status:'processed', g:"<stop offset='0' stop-color='%23ffd36e'/><stop offset='1' stop-color='%23ff2d78'/>" },
+      { id:2, title:'Morning coffee', width:1080, height:1080, size_bytes:356000, status:'processed', g:"<stop offset='0' stop-color='%237afcff'/><stop offset='1' stop-color='%23ff6ac1'/>" },
+      { id:3, title:'Trailhead', width:2400, height:1600, size_bytes:1290000, status:'uploaded', g:"<stop offset='0' stop-color='%2334c759'/><stop offset='1' stop-color='%230071e3'/>" },
+      { id:4, title:'City lights', width:1600, height:900, size_bytes:610000, status:'processed', g:"<stop offset='0' stop-color='%23c86dd7'/><stop offset='1' stop-color='%233023ae'/>" },
+    ];
+
+    async function load() {
+      try {
+        const r = await fetch('/photos');
+        if (!r.ok) throw new Error('bad status');
+        const data = await r.json();
+        conn.textContent = 'connected'; connDot.style.background = 'var(--green)';
+        const photos = data.photos || [];
+        if (!photos.length) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        grid.innerHTML = photos.map(p => card(p)).join('');
+      } catch (e) {
+        conn.textContent = 'preview mode'; connDot.style.background = 'var(--orange)';
+        banner.style.display = 'flex';
+        grid.innerHTML = demo.map(p => card(p, demoTile(p.g))).join('');
+      }
+    }
+
+    document.getElementById('file').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      document.getElementById('fileName').textContent = f ? f.name : 'no file selected';
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById('file');
+      const btn = document.getElementById('uploadBtn');
+      if (!fileInput.files.length) return;
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      fd.append('title', document.getElementById('title').value);
+      btn.disabled = true; btn.textContent = 'Uploading';
+      try {
+        const r = await fetch('/photos', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('upload failed');
+        document.getElementById('title').value = '';
+        fileInput.value = '';
+        document.getElementById('fileName').textContent = 'no file selected';
+        await load();
+      } catch (err) {
+        alert('Upload failed — is the API running? (' + err.message + ')');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Upload';
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,519 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  PhotoShare - Phase 2 (hardened + multi-AZ). Builds on the Phase 1 faithful
+  rebuild and applies the four documented improvements as deliberate changes:
+    1. db-sg source tightened to the web SG (was: whole VPC CIDR).
+    2. Web tier moved to PRIVATE subnets; admin via Session Manager (no public IP).
+    3. Single EC2 -> Launch Template + Auto Scaling Group across 2 AZs
+       (ASG auto-registers targets with the ALB).
+    4. RDS Multi-AZ enabled (synchronous standby in AZ2) -> near-zero RPO.
+
+  Requirements driving this (confirmed): near-zero RPO, ~99.9% availability,
+  single region, cost-sensitive, no auth in v1. See ../walkthrough.md section 3.
+
+  NOTE: authored, NOT yet deployed/validated. Run validate-template + cfn-lint,
+  deploy to a throwaway stack, verify, then tear down (RDS/ALB/NAT bill hourly).
+
+Parameters:
+  VpcCidr: { Type: String, Default: 10.0.0.0/16 }
+  PublicSubnet1Cidr: { Type: String, Default: 10.0.1.0/24 }
+  PrivateSubnet1Cidr: { Type: String, Default: 10.0.2.0/24 }
+  PublicSubnet2Cidr: { Type: String, Default: 10.0.3.0/24 }
+  PrivateSubnet2Cidr: { Type: String, Default: 10.0.4.0/24 }
+  Az1: { Type: AWS::EC2::AvailabilityZone::Name, Default: us-east-1a }
+  Az2: { Type: AWS::EC2::AvailabilityZone::Name, Default: us-east-1b }
+  WebAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  WebInstanceType: { Type: String, Default: t3.micro }
+  DbInstanceClass: { Type: String, Default: db.t3.micro }
+  DbName: { Type: String, Default: photoshare }
+  DbUsername: { Type: String, Default: admin }
+  AppPort: { Type: Number, Default: 80 }
+  AsgMinSize: { Type: Number, Default: 2 }
+  AsgMaxSize: { Type: Number, Default: 4 }
+  AsgDesiredCapacity: { Type: Number, Default: 2 }
+  AppImageUri:
+    Type: String
+    Default: kodekloud/photosharing-app
+    Description: >
+      Container image to run. Defaults to the public KodeKloud image; set to your
+      own ECR image (e.g. <acct>.dkr.ecr.us-east-1.amazonaws.com/photoshare-app:latest)
+      once you've built and pushed it (see ../app/README.md).
+  InternalApiKey:
+    Type: String
+    Default: change-me
+    NoEcho: true
+    Description: Shared secret gating POST /internal/metadata (app + Lambda must match).
+
+Resources:
+
+  # =========================================================================
+  # LAYER 1 - NETWORK
+  # CHANGE vs Phase 1: private subnets now need OUTBOUND internet (for the web
+  # instances to pull packages / reach S3 / Secrets Manager over public
+  # endpoints) now that they're private -> add a NAT Gateway.
+  # =========================================================================
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: photoshare-vpc }]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{ Key: Name, Value: photoshare-igw }]
+
+  IgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref InternetGateway }
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet1Cidr
+      AvailabilityZone: !Ref Az1
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: photoshare-public-1 }]
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      AvailabilityZone: !Ref Az1
+      Tags: [{ Key: Name, Value: photoshare-private-1 }]
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet2Cidr
+      AvailabilityZone: !Ref Az2
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: photoshare-public-2 }]
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      AvailabilityZone: !Ref Az2
+      Tags: [{ Key: Name, Value: photoshare-private-2 }]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc, Tags: [{ Key: Name, Value: photoshare-public-rt }] }
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { RouteTableId: !Ref PublicRouteTable, SubnetId: !Ref PublicSubnet1 }
+  PublicSubnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { RouteTableId: !Ref PublicRouteTable, SubnetId: !Ref PublicSubnet2 }
+
+  # NAT Gateway (in a public subnet) gives the private web tier OUTBOUND-only
+  # internet. Single NAT to control cost (a Phase-2 tradeoff: a single-AZ NAT is
+  # itself an AZ-failure risk for outbound egress; documented in the walkthrough).
+  NatEip:
+    Type: AWS::EC2::EIP
+    Properties: { Domain: vpc }
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags: [{ Key: Name, Value: photoshare-nat }]
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc, Tags: [{ Key: Name, Value: photoshare-private-rt }] }
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { RouteTableId: !Ref PrivateRouteTable, SubnetId: !Ref PrivateSubnet1 }
+  PrivateSubnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { RouteTableId: !Ref PrivateRouteTable, SubnetId: !Ref PrivateSubnet2 }
+
+  # =========================================================================
+  # LAYER 2 - SECURITY GROUPS
+  # =========================================================================
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB - allow HTTP from the internet
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP from internet }
+      Tags: [{ Key: Name, Value: photoshare-alb-sg }]
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Web tier - app port from ALB only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref AppPort
+          ToPort: !Ref AppPort
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+          Description: App traffic from ALB only
+      Tags: [{ Key: Name, Value: photoshare-web-sg }]
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS - MySQL from the web tier only
+      VpcId: !Ref Vpc
+      # CHANGE #1 vs Phase 1: source is the web SG, not 10.0.0.0/16.
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+          Description: MySQL from web tier only (hardened)
+      Tags: [{ Key: Name, Value: photoshare-db-sg }]
+
+  # =========================================================================
+  # LAYER 3 - IAM
+  # =========================================================================
+  Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: iam_role_ec2
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: ec2.amazonaws.com }, Action: sts:AssumeRole }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore          # Session Manager (admin without SSH)
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly    # pull own image from ECR
+      Policies:
+        - PolicyName: read-db-secret
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Effect: Allow, Action: secretsmanager:GetSecretValue, Resource: !Ref DbSecret }
+      Tags: [{ Key: Name, Value: iam_role_ec2 }]
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [ !Ref Ec2Role ] }
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: iam_role_lambda
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: read-uploaded-images
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Constructed ARN (not !GetAtt ImageBucket.Arn) to avoid a circular
+              # dependency: bucket -> lambda -> role -> bucket.
+              - { Effect: Allow, Action: [ s3:GetObject ], Resource: !Sub "arn:aws:s3:::photoshare-images-${AWS::AccountId}/*" }
+      Tags: [{ Key: Name, Value: iam_role_lambda }]
+
+  # =========================================================================
+  # LAYER 4 - DATA  (RDS now Multi-AZ)
+  # =========================================================================
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: photoshare/db-credentials
+      Description: PhotoShare RDS master credentials
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username":"${DbUsername}"}'
+        GenerateStringKey: password
+        PasswordLength: 20
+        ExcludeCharacters: '"@/\'
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: PhotoShare private DB subnets (2 AZ)
+      SubnetIds: [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]
+      Tags: [{ Key: Name, Value: photoshare-db-subnet-group }]
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot          # snapshot on stack delete
+    UpdateReplacePolicy: Snapshot     # snapshot if an update forces replacement
+    Properties:
+      DBInstanceIdentifier: photoshare-db
+      Engine: mysql
+      DBName: !Ref DbName
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: "20"
+      MasterUsername: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:password}}"
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups: [ !Ref DbSecurityGroup ]
+      PubliclyAccessible: false
+      MultiAZ: true                   # CHANGE #4: synchronous standby -> near-zero RPO
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7        # point-in-time restore window
+
+  DbSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DbSecret
+      TargetId: !Ref Database
+      TargetType: AWS::RDS::DBInstance
+
+  # =========================================================================
+  # LAYER 5 - COMPUTE  (Launch Template + ASG in PRIVATE subnets; ALB public)
+  # CHANGES #2 + #3.
+  # =========================================================================
+  WebLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: photoshare-web-lt
+      LaunchTemplateData:
+        ImageId: !Ref WebAmiId
+        InstanceType: !Ref WebInstanceType
+        IamInstanceProfile: { Arn: !GetAtt Ec2InstanceProfile.Arn }
+        SecurityGroupIds: [ !Ref WebSecurityGroup ]
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euxo pipefail
+            # --- Docker + compose plugin (Amazon Linux 2023) ---
+            dnf install -y docker
+            systemctl enable --now docker
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+              -o /usr/local/lib/docker/cli-plugins/docker-compose
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            # --- ECR login (no-op/harmless for the public default image) ---
+            aws ecr get-login-password --region ${AWS::Region} \
+              | docker login --username AWS --password-stdin ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com || true
+            # --- app config: creds are NOT here, only the secret NAME ---
+            mkdir -p /opt/photoshare && cd /opt/photoshare
+            cat > .env <<ENVEOF
+            S3_BUCKET=photoshare-images-${AWS::AccountId}
+            AWS_SECRET_NAME=photoshare/db-credentials
+            AWS_REGION=${AWS::Region}
+            INTERNAL_API_KEY=${InternalApiKey}
+            ENVEOF
+            cat > docker-compose.yml <<COMPOSEEOF
+            services:
+              api:
+                image: ${AppImageUri}
+                container_name: photoshare-app
+                ports:
+                  - "80:8000"
+                env_file:
+                  - .env
+                restart: always
+            COMPOSEEOF
+            docker compose up -d
+
+  WebAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: photoshare-web-asg
+      MinSize: !Ref AsgMinSize
+      MaxSize: !Ref AsgMaxSize
+      DesiredCapacity: !Ref AsgDesiredCapacity
+      LaunchTemplate:
+        LaunchTemplateId: !Ref WebLaunchTemplate
+        Version: !GetAtt WebLaunchTemplate.LatestVersionNumber
+      # Instances launch in the PRIVATE subnets (no public IP) across both AZs.
+      VPCZoneIdentifier: [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]
+      # ASG auto-registers instances into the ALB target group as they launch.
+      TargetGroupARNs: [ !Ref WebTargetGroup ]
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 120
+      Tags:
+        - { Key: Name, Value: photoshare-web, PropagateAtLaunch: true }
+
+  WebScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref WebAutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification: { PredefinedMetricType: ASGAverageCPUUtilization }
+        TargetValue: 60
+
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: photoshare-alb
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups: [ !Ref AlbSecurityGroup ]
+      Subnets: [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]
+
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: photoshare-tg
+      VpcId: !Ref Vpc
+      Protocol: HTTP
+      Port: !Ref AppPort
+      TargetType: instance           # ASG populates targets; no static Targets list
+      HealthCheckPath: /health       # matches the app's shallow health endpoint
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+
+  AlbListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - { Type: forward, TargetGroupArn: !Ref WebTargetGroup }
+
+  # =========================================================================
+  # LAYER 6 - SERVERLESS + OBSERVABILITY
+  # =========================================================================
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    # Notification config needs the invoke permission to exist first.
+    DependsOn: S3InvokeLambdaPermission
+    Properties:
+      BucketName: !Sub "photoshare-images-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - { Event: s3:ObjectCreated:*, Function: !GetAtt ImageProcessor.Arn }
+
+  # CHANGE: dead-letter queue for the image processor (failure-mode mitigation).
+  ImageDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: photoshare-image-dlq
+      MessageRetentionPeriod: 1209600   # 14 days
+
+  ImageProcessor:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: photoshare-image-processor
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 30
+      DeadLetterConfig: { TargetArn: !GetAtt ImageDlq.Arn }
+      Environment:
+        Variables:
+          ALB_DNS: !GetAtt Alb.DNSName
+          INTERNAL_API_KEY: !Ref InternalApiKey
+      Code:
+        ZipFile: |
+          import json, os, urllib.request, urllib.parse
+          # On S3 upload: pull size from the event, call the app back through the
+          # ALB so the WEB APP writes to RDS (Lambda stays out of the DB path).
+          def handler(event, context):
+              alb = os.environ["ALB_DNS"]
+              key = os.environ.get("INTERNAL_API_KEY", "")
+              for rec in event.get("Records", []):
+                  s3 = rec["s3"]
+                  obj_key = urllib.parse.unquote(s3["object"]["key"])
+                  payload = json.dumps({
+                      "s3_key": obj_key,
+                      "size_bytes": s3["object"].get("size"),
+                  }).encode()
+                  req = urllib.request.Request(
+                      f"http://{alb}/internal/metadata",
+                      data=payload, method="POST",
+                      headers={"Content-Type": "application/json",
+                               "X-Internal-Key": key},
+                  )
+                  with urllib.request.urlopen(req, timeout=10) as r:
+                      print("callback status:", r.status, "key:", obj_key)
+              return {"status": "ok"}
+
+  LambdaDlqSendPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: lambda-dlq-send
+      Roles: [ !Ref LambdaRole ]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Action: sqs:SendMessage, Resource: !GetAtt ImageDlq.Arn }
+
+  S3InvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ImageProcessor
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:s3:::photoshare-images-${AWS::AccountId}"
+
+  HighCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: photoshare-asg-high-cpu
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions: [ { Name: AutoScalingGroupName, Value: !Ref WebAutoScalingGroup } ]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  LambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: photoshare-lambda-errors
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [ { Name: FunctionName, Value: !Ref ImageProcessor } ]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  AlbDnsName:
+    Description: Public entry point
+    Value: !GetAtt Alb.DNSName
+  RdsEndpoint:
+    Description: RDS endpoint (multi-AZ; reachable only from the web tier)
+    Value: !GetAtt Database.Endpoint.Address
+  ImageBucketName:
+    Value: !Ref ImageBucket
+  ImageDlqUrl:
+    Value: !Ref ImageDlq
