@@ -1,0 +1,18 @@
+version: 0.2
+# Used by AWS CodeBuild to build the PhotoShare image and push it to ECR,
+# so we can build without a local Docker daemon.
+# Expects env vars: ACCOUNT_ID, AWS_DEFAULT_REGION, REPO_URI (set on the project).
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+  build:
+    commands:
+      - echo "Building image..."
+      - docker build -t $REPO_URI:latest .
+  post_build:
+    commands:
+      - echo "Pushing image..."
+      - docker push $REPO_URI:latest
+      - echo "Done -> $REPO_URI:latest"

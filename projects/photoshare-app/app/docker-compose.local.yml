@@ -1,0 +1,50 @@
+# LOCAL TEST HARNESS ONLY — not for deployment.
+# Runs MySQL + MinIO (S3-compatible) + the app, so the API can be smoke-tested
+# end-to-end with zero AWS dependency. Start with:
+#   docker compose -f docker-compose.local.yml up --build -d
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: localpass
+      MYSQL_DATABASE: photoshare
+    ports:
+      - "3307:3306"          # host 3307 to avoid clashing with a local MySQL
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-plocalpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"          # S3 API (host access for the Lambda test)
+      - "9001:9001"          # web console
+
+  app:
+    build: .
+    ports:
+      - "8080:8000"          # host 8080 -> container 8000
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      LOCAL_DB: "1"
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: localpass
+      DB_NAME: photoshare
+      S3_BUCKET: photoshare-local
+      S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: us-east-1
+      INTERNAL_API_KEY: local-test-key

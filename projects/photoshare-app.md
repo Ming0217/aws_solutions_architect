@@ -7,14 +7,19 @@ services:
   - vpc
   - alb
   - ec2
+  - asg
   - rds
   - s3
   - lambda
+  - sqs
   - iam
   - kms
   - secrets-manager
   - cloudwatch
-status: in-progress
+  - ecr
+  - codebuild
+  - nat-gateway
+status: iac-rebuilt-and-tested
 tags:
   - aws
   - project
@@ -22,10 +27,24 @@ tags:
 
 # Project: PhotoShare — Instagram-style photo sharing app
 
-> Related: [[projects/projects|projects index]]
-> Design source: KodeKloud project template.
-> Part of the [H2 2026 AWS OKR](../README.md) — counts toward both KR1 (documented
-> architecture) and KR2 (working project).
+> Related: [[projects/projects|projects index]] ·
+> [architecture walkthrough](./photoshare-app/walkthrough.md) ·
+> [IaC](./photoshare-app/iac/README.md) · [app](./photoshare-app/app/README.md) ·
+> [lambda](./photoshare-app/lambda/README.md)
+> Design source: KodeKloud project template (v1 console build); since rebuilt as
+> IaC with a self-built app + frontend.
+> Part of the [H2 2026 AWS OKR](../README.md) — counts toward KR1 (documented
+> architecture), KR2 (working project), KR3 (Well-Architected), and KR4 (walkthrough).
+
+> **Update 2026-07-05 — IaC rebuild deployed & tested.** The console build has
+> been reproduced as **CloudFormation** (Phase 1 faithful → Phase 2 hardened +
+> multi-AZ), the tutorial's prebuilt image replaced with a **self-built FastAPI
+> app + Apple-style frontend** (built via **CodeBuild → ECR**, no local Docker),
+> and the Phase 2 stack was **deployed and validated end-to-end on real AWS**.
+> The earlier "Reliability not yet addressed" gap is now **closed** (ASG + RDS
+> Multi-AZ, verified live). Details in the [walkthrough §7](./photoshare-app/walkthrough.md).
+> Sections below describing the original console build are kept as the v1 record;
+> deltas are noted inline.
 
 ## Use case / goal
 
@@ -80,6 +99,11 @@ general mechanics (route tables, IGW, subnet associations) behind this split.
 > designed) or move to the private subnet behind the ALB, using Session Manager
 > for admin access instead of SSH. Currently following the KodeKloud design
 > (EC2 in public subnet); revisit this as a hardening step.
+>
+> **✅ Resolved in the IaC Phase 2 rebuild:** the web tier now runs in the
+> **private subnets** behind the ALB (Launch Template + ASG), with admin via
+> Session Manager and outbound access via a NAT gateway. Only the ALB is
+> internet-facing.
 
 ### Subnet CIDR plan
 
@@ -134,6 +158,14 @@ IAM note]] for the general "how a role gets associated" mechanics.
 | --- | --- | --- | --- |
 | `iam_role_ec2` | `ec2.amazonaws.com` | Wrapped in an **instance profile**, attached to the EC2 instance | `AmazonS3FullAccess`, `AWSSecretsManagerClientReadOnlyAccess` |
 | `iam_role_lambda` | `lambda.amazonaws.com` | Set directly as the function's **execution role** — no instance-profile-equivalent needed | TBD |
+
+> **Confirmed / refined in the IaC rebuild** (the console TBDs are now resolved):
+> - `iam_role_lambda` = `AWSLambdaBasicExecutionRole` (CloudWatch Logs) +
+>   scoped `s3:GetObject` on the image bucket + `sqs:SendMessage` on the DLQ.
+> - `iam_role_ec2` also got `AmazonSSMManagedInstanceCore` (Session Manager) and
+>   `AmazonEC2ContainerRegistryReadOnly` (pull the app image from ECR), and the
+>   broad Secrets-Manager managed policy was replaced with a **scoped inline
+>   policy** limited to this project's secret (least privilege).
 
 **Why EC2 needs those two specific policies — two unrelated jobs:**
 
@@ -268,30 +300,28 @@ background. **Advanced Settings → Enable VPC: left unchecked.**
 - **Security:** private RDS with no public access, Secrets Manager + KMS for
   credentials, S3 public access fully blocked, IAM roles instead of hardcoded
   keys — no static credentials anywhere in the stack.
-- **Reliability:** *not yet addressed* — the network is already provisioned
-  across 2 AZs (subnets in us-east-1a and us-east-1b, see Subnet CIDR plan
-  above), but nothing actually uses the second AZ yet: single EC2 instance
-  behind the ALB, no Auto Scaling Group, no Multi-AZ RDS. This is the known
-  gap against the OKR's KR2 "failure handling" requirement. Planned next step:
-  add an ASG (see [[learning-plan/04-networking/load-balancers|ALB + ASG
-  pattern]]) and enable RDS Multi-AZ — turning on features the network
-  already has room for, not re-architecting subnets.
+- **Reliability:** ✅ **addressed in IaC Phase 2 and verified live.** The web
+  tier now runs as an **Auto Scaling Group across 2 AZs** behind the ALB (see
+  [[learning-plan/04-networking/load-balancers|ALB + ASG pattern]]), and RDS is
+  **Multi-AZ** (synchronous standby). During deployment the ASG's self-healing
+  was observed for real (unhealthy instances auto-replaced). Remaining SPOF: a
+  single NAT gateway (outbound egress only — accepted at ~99.9%).
 - **Scalability:** Lambda handles image-processing burst load automatically
-  (serverless, scales with S3 upload events); EC2/ALB scaling not yet in place
-  (depends on the ASG addition above).
-- **Cost:** *to be assessed* — single EC2 instance + RDS instance are the main
-  fixed costs; Lambda and S3 are pay-per-use.
+  (serverless); the web tier now scales via ASG **target-tracking on CPU (60%)**.
+- **Cost:** main fixed costs are RDS Multi-AZ, the NAT gateway, and the ALB
+  (~$0.16/hr all-in for the test); Lambda + S3 are pay-per-use. Single NAT
+  chosen deliberately to control cost.
 
 ## Well-Architected review
 
 | Pillar | Finding | Improvement made |
 | --- | --- | --- |
-| Operational Excellence | | |
-| Security | Good baseline: private DB, blocked S3 public access, no hardcoded creds | |
-| Reliability | No ASG, no Multi-AZ — single point of failure on EC2 and RDS | Planned: add ASG + Multi-AZ |
-| Performance Efficiency | | |
-| Cost Optimization | | |
-| Sustainability | | |
+| Operational Excellence | Console build wasn't reproducible | Rebuilt as **CloudFormation** (versioned IaC); app built via **CodeBuild → ECR**; pre-deploy `validate-template` + `cfn-lint` |
+| Security | Good baseline: private DB, blocked S3 public access, no hardcoded creds | **db-sg scoped to web SG**; **EC2 moved to private subnets** (Session Manager admin); scoped inline Secrets policy (dropped broad managed policy) |
+| Reliability | No ASG, no Multi-AZ — SPOF on EC2 and RDS | **ASG across 2 AZs + RDS Multi-AZ + DLQ**, deployed and verified live |
+| Performance Efficiency | No auto-scaling | ASG **target-tracking on CPU**; serverless image processing |
+| Cost Optimization | Not assessed | t3.micro + single NAT to control cost; pay-per-use Lambda/S3 (right-size after load testing) |
+| Sustainability | — | Managed services + scale-to-zero Lambda |
 
 ## Build log / steps
 
@@ -341,7 +371,17 @@ not yet done — see Next steps below.
   not the EC2 security group specifically — broader than the "only EC2 can
   reach it" goal implies. Tutorial simplification (avoids a dependency-order
   problem, since `db-sg` may be created before the EC2 security group
-  exists); flagged as a hardening item, not yet fixed.
+  exists); flagged as a hardening item. **✅ Fixed in IaC Phase 2:** `db-sg`
+  now sources the **web security group** directly (CloudFormation orders the
+  dependency for us), so only the web tier can reach MySQL.
+- **App crash-loop on first deploy — MySQL 8 auth plugin.** The self-built app
+  couldn't authenticate to RDS: `'cryptography' package is required for
+  sha256_password or caching_sha2_password auth methods`. MySQL 8 defaults to
+  the **`caching_sha2_password`** plugin, which **PyMySQL needs the
+  `cryptography` package** to handle — and it was missing from
+  `requirements.txt`. Instances failed startup and the ASG kept recycling them.
+  **Fix:** add `cryptography`, rebuild the image, roll the ASG (instance
+  refresh). A local Docker smoke-test would have caught this instantly.
 
 ## Verifying the app — inspecting RDS data
 
@@ -376,40 +416,73 @@ aws ssm start-session \
 
 Then point the GUI client at `localhost:3306` with the same DB credentials.
 
+## IaC rebuild & live deploy (2026-07-05)
+
+Reproduced the console build as code and deployed it for real. Full record in the
+[walkthrough §7](./photoshare-app/walkthrough.md); summary:
+
+1. **CloudFormation, two phases** — `iac/photoshare-phase1.yaml` (faithful
+   rebuild, including the known gaps) → `iac/photoshare-phase2.yaml` (hardened:
+   db-sg scoped, EC2 private + NAT, Launch Template + ASG across 2 AZs, RDS
+   Multi-AZ, SQS DLQ).
+2. **Self-built app** — FastAPI service + Apple-style frontend
+   ([`app/`](./photoshare-app/app/README.md)) replacing the tutorial image;
+   reverse-engineered image-processing Lambda ([`lambda/`](./photoshare-app/lambda/README.md)).
+3. **Built without local Docker** — image built via **CodeBuild** (source → S3,
+   privileged build) and pushed to **ECR**.
+4. **Pre-deploy validation paid off** — `validate-template` caught a circular
+   dependency; `cfn-lint` caught a missing RDS `UpdateReplacePolicy`. Both fixed
+   before deploying.
+5. **Deployed Phase 2 + passed live E2E** — upload → S3 → Lambda → ALB callback →
+   RDS (`processed`, dimensions `240×160`), image served through the app, RDS
+   confirmed private + Multi-AZ, DLQ empty. One real bug found & fixed (the
+   `cryptography`/MySQL-8 auth issue — see Gotchas).
+
 ## Next steps
 
-Console build ("Mission Accomplished" per the tutorial) is functionally
-complete, but not yet OKR-complete. Mapped against the H2 2026 OKR:
+Core OKR work for this project is **done** (KR1 architecture, KR2 working +
+failure handling, KR3 Well-Architected pass, KR4 walkthrough). Optional polish:
 
-1. **Add an ASG + enable RDS Multi-AZ** (tutorial's own "Auto Scaling" next
-   step) — closes the Reliability gap, the one item blocking this project
-   from satisfying KR2's "failure handling" requirement.
-2. **Finish the Well-Architected review table** — only Security and
-   Reliability have findings; still need Operational Excellence, Performance
-   Efficiency, Cost Optimization, and Sustainability passes (KR3).
-3. **Write the final Walkthrough summary** below once step 1 is done (KR4).
-4. **Fix the `db-sg` broad-source hardening item** (see Gotchas above) while
-   doing the Security pillar review.
-
-Tutorial also suggests CloudFormation/IaC and Route 53 + ACM (domain/HTTPS) —
-good polish, but not required by any of the 4 KRs; treat as optional
-follow-on rather than blockers.
+1. **Deploy the fuller Lambda by default** (currently the template ships the
+   trimmed inline version; the dimension-parsing `handler.py` was applied via
+   `update-function-code`). Package it in the template via S3 or a build step.
+2. **Route 53 + ACM (HTTPS)** and an internal listener for the callback route.
+3. **Scope `AmazonS3FullAccess`** down to the specific bucket/actions.
+4. **Local Docker smoke-test tier** so app bugs (like the `cryptography` one)
+   are caught before an AWS deploy.
 
 ## Cleanup
 
-- [ ] Tore down resources to avoid charges
+Torn down 2026-07-05 after the successful live test (verified nothing lingers):
+
+- [x] Deleted the `photoshare-phase2` stack (RDS took a final snapshot on delete)
+- [x] Deleted that final RDS snapshot too (throwaway test data)
+- [x] Emptied + deleted the image bucket and the CodeBuild source bucket
+- [x] Deleted the CodeBuild project, ECR repo, and CodeBuild IAM role
+- [x] Deleted the leftover CloudWatch log groups (Lambda + CodeBuild)
+- [x] Confirmed no unassociated Elastic IPs, buckets, or snapshots remain
 
 ## Walkthrough summary
 
-*Draft — fill in once resilience (ASG + Multi-AZ) is added; see Next steps.*
-
-PhotoShare separates public-facing compute (ALB + EC2) from private data (RDS)
-using VPC subnetting, removes all static credentials via IAM roles + Secrets
-Manager + KMS, and offloads image processing to Lambda triggered by S3 events
-(with no VPC attachment, relying on default internet access). Known gap: no
-resilience story yet for EC2/RDS failure (single instance, no Multi-AZ) — to
-be addressed before considering this complete against the OKR.
+PhotoShare separates public-facing compute (ALB + a self-built FastAPI web tier
+on EC2) from private data (RDS MySQL, Multi-AZ, no public access) using VPC
+subnetting; removes all static credentials via IAM roles + Secrets Manager + KMS;
+and offloads image processing to an S3-triggered Lambda that calls back through
+the ALB (keeping it out of the DB path). Rebuilt from the console as
+**CloudFormation** (faithful → hardened + multi-AZ), the app image built in the
+cloud via **CodeBuild → ECR**, and the whole stack **deployed and validated
+end-to-end on real AWS**. Reliability (ASG across 2 AZs + RDS Multi-AZ) is in
+place and was observed self-healing during the deploy.
 
 ## Takeaways
 
--
+- **Real AWS validation catches what local parsing can't** — `validate-template`
+  surfaced a circular dependency; `cfn-lint` a missing `UpdateReplacePolicy`.
+- **A live deploy surfaces runtime bugs static checks miss** — the MySQL 8
+  `caching_sha2_password` / `cryptography` crash-loop only appeared at runtime;
+  it argues strongly for a local container smoke-test tier.
+- **The ASG + ALB + Multi-AZ pattern self-heals** — watched unhealthy instances
+  get replaced and a rolled image go healthy with no manual steps.
+- **You can build container images without local Docker** — CodeBuild + ECR.
+- **IaC makes hardening a reviewable diff** — Phase 1 → Phase 2 turned each known
+  gap (db-sg, EC2 placement, reliability) into an explicit, documented change.
