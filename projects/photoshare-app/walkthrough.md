@@ -35,6 +35,8 @@ prebuilt image so we own the full runtime contract. It was rebuilt from the
 console version as **CloudFormation** (Phase 1 faithful → Phase 2 hardened +
 multi-AZ), and the whole stack was **deployed and tested end-to-end on real AWS**.
 
+![PhotoShare landing page — hero + CTA, served via the ALB](./screenshots/01-frontend-hero.png)
+
 ## 2. Design choices (why each service)
 
 | Component | Choice | Why |
@@ -165,6 +167,8 @@ Phase 2 (the deployed stack) closes the Phase 1 single points of failure.
 | DLQ depth | 0 (no failed invocations) |
 | Frontend (Apple UI) served via ALB | serving |
 
+![Gallery view — uploaded photos with per-image status dots and extracted dimensions (the S3 → Lambda → ALB callback result)](./screenshots/02-gallery.png)
+
 ### The one real bug (worth remembering)
 
 The app crash-looped on first deploy: PyMySQL couldn't authenticate to **MySQL 8**
@@ -187,3 +191,27 @@ smoke-test would have caught instantly — a concrete argument for that test tie
 - **The trimmed inline Lambda vs. the fuller `handler.py`**: the template ships a
   minimal inline function (size only, due to the 4096-char inline cap); the full
   dimension-parsing handler was deployed separately via `update-function-code`.
+
+## Screenshots
+
+Images live in [`screenshots/`](./screenshots/) (see its README for the naming
+convention). To embed one, use a relative path, e.g.:
+
+```markdown
+![Gallery view](./screenshots/02-gallery.png)
+```
+
+Planned shots (check off as added):
+
+- [x] `01-frontend-hero.png` — landing page (hero + CTA) — embedded in §1
+- [x] `02-gallery.png` — gallery with uploaded photos — embedded in §7
+- [ ] `04-cfn-stack-complete.png` — CloudFormation `CREATE_COMPLETE`
+- [ ] `05-alb-targets-healthy.png` — ALB targets healthy across 2 AZs
+- [ ] `06-rds-multiaz.png` — RDS Multi-AZ + not publicly accessible
+- [ ] `07-s3-block-public-access.png` — S3 bucket public access blocked
+- [ ] `08-cloudwatch.png` — CloudWatch dashboard / alarms
+
+<!-- Once files are added, drop the embeds inline in the relevant sections, e.g.:
+![Landing page](./screenshots/01-frontend-hero.png)
+![Healthy ALB targets](./screenshots/05-alb-targets-healthy.png)
+-->
