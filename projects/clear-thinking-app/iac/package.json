@@ -1,0 +1,31 @@
+{
+  "name": "clear-thinking-iac",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "clear-thinking": "bin/clear-thinking.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy",
+    "diff": "cdk diff"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "3.632.0",
+    "@aws-sdk/lib-dynamodb": "3.632.0",
+    "@types/node": "^20.14.0",
+    "aws-cdk": "^2.170.0",
+    "esbuild": "^0.23.0",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.5.4"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "3.632.0",
+    "aws-cdk-lib": "^2.170.0",
+    "aws-jwt-verify": "^4.0.1",
+    "constructs": "^10.3.0"
+  }
+}
