@@ -12,6 +12,9 @@ My personal knowledge base while working through the
 [AWS Solutions Architect Learning Plan](https://skillbuilder.aws/learning-plan/EB6SVX4CTK/aws-solutions-architect-learning-plan-includes-labs/SAJSTUCC44)
 on AWS Skill Builder, plus any other useful things I pick up along the way.
 
+**North star:** [[OKR-2026-H2|H2 2026 OKR]] — the objective and key results this
+repo is evidence for. Notes and projects reference it as `okr: H2 2026 — KRn`.
+
 ## How this repo is organized
 
 | Folder | What goes here |

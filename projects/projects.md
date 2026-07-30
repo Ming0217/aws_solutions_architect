@@ -17,6 +17,7 @@ Use [[templates/project-note|the project template]] for new entries.
 ## Index
 
 - [[projects/photoshare-app|PhotoShare — Instagram-style photo sharing app]]
+- [[projects/clear-thinking-app|Clear Thinking — AI-assisted decision framework]]
 
 ## Dataview: all projects
 

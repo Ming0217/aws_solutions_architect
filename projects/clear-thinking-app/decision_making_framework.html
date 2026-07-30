@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clear Thinking Decision Framework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #FAFAFA;
+      --bg-elevated: #FFFFFF;
+      --bg-recessed: #F2F2F2;
+      --text-primary: #171717;
+      --text-secondary: #4D4D4D;
+      --text-muted: #8F8F8F;
+      --interactive-blue: #0072F5;
+      --focus-blue: #005FCC;
+      --border-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+      --shadow-small: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 2px rgba(0,0,0,0.04);
+      --shadow-medium: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 2px rgba(0,0,0,0.04), 0 8px 8px -8px rgba(0,0,0,0.04);
+      --focus-ring: 0 0 0 2px #FFF, 0 0 0 4px #0072F5;
+      --radius: 6px;
+      --radius-card: 12px;
+      --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+      --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+      --page-width: 800px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --green: #398E4A;
+      --red: #E5484D;
+      --orange: #FF990A;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--text-primary);
+      background: var(--bg-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      height: 56px; display: flex; align-items: center; gap: var(--space-3);
+      padding: 0 var(--space-6);
+      background: var(--bg-primary);
+      box-shadow: 0 1px 0 0 rgba(0,0,0,0.08);
+    }
+    .header-title { font-size: 14px; font-weight: 500; }
+    .header-subtitle { font-size: 12px; color: var(--text-muted); }
+
+    /* Layout */
+    .page-layout {
+      max-width: calc(var(--page-width) + 80px);
+      margin: 0 auto;
+      padding: var(--space-10) var(--space-6) var(--space-16);
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: var(--space-8);
+    }
+
+    .main {
+      max-width: var(--page-width);
+      min-width: 0;
+    }
+
+    /* Side Rail (Desktop) */
+    .side-rail {
+      position: sticky;
+      top: 80px;
+      height: fit-content;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: var(--space-4);
+    }
+
+    .rail-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--bg-recessed);
+      box-shadow: var(--border-shadow);
+      cursor: pointer;
+      border: none; padding: 0;
+      transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+      position: relative;
+      z-index: 2;
+    }
+    .rail-dot:hover { transform: scale(1.3); }
+    .rail-dot:focus { outline: none; box-shadow: var(--focus-ring); }
+    .rail-dot.active { background: var(--interactive-blue); box-shadow: 0 0 0 3px rgba(0,114,245,0.15); }
+    .rail-dot.completed { background: var(--green); box-shadow: none; }
+
+    .rail-connector {
+      width: 2px; height: 24px;
+      background: var(--bg-recessed);
+      flex-shrink: 0;
+    }
+    .rail-connector.completed { background: var(--green); }
+
+    .rail-label {
+      font-size: 10px; color: var(--text-muted);
+      margin-top: var(--space-3);
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    /* Mobile horizontal tracker */
+    .mobile-tracker {
+      display: none;
+      position: sticky;
+      top: 56px;
+      z-index: 99;
+      background: var(--bg-primary);
+      padding: var(--space-3) var(--space-6);
+      box-shadow: 0 1px 0 0 rgba(0,0,0,0.06);
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+    }
+
+    .mobile-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--bg-recessed);
+      box-shadow: var(--border-shadow);
+      cursor: pointer;
+      border: none; padding: 0;
+      transition: background 0.2s ease;
+    }
+    .mobile-dot:focus { outline: none; box-shadow: var(--focus-ring); }
+    .mobile-dot.active { background: var(--interactive-blue); }
+    .mobile-dot.completed { background: var(--green); box-shadow: none; }
+
+    .mobile-connector {
+      width: 12px; height: 2px;
+      background: var(--bg-recessed);
+      flex-shrink: 0;
+    }
+    .mobile-connector.completed { background: var(--green); }
+
+    @media (max-width: 768px) {
+      .side-rail { display: none; }
+      .mobile-tracker { display: flex; }
+      .page-layout {
+        grid-template-columns: 1fr;
+        gap: 0;
+        padding: var(--space-6) var(--space-4) var(--space-12);
+      }
+    }
+
+    /* Hero */
+    .hero { margin-bottom: var(--space-12); }
+    .hero h1 {
+      font-size: 40px; font-weight: 600; line-height: 1.1;
+      letter-spacing: -1.8px; margin-bottom: var(--space-3);
+    }
+    .hero p { font-size: 15px; color: var(--text-secondary); line-height: 1.6; max-width: 600px; }
+
+    /* (progress tracker is now the side rail / mobile dots) */
+
+    /* Stage card */
+    .stage {
+      background: var(--bg-elevated);
+      box-shadow: var(--shadow-medium);
+      border-radius: var(--radius-card);
+      margin-bottom: var(--space-6);
+      overflow: hidden;
+    }
+    .stage-header {
+      display: flex; align-items: center; gap: var(--space-4);
+      padding: var(--space-6);
+      cursor: pointer; user-select: none;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s ease;
+      min-height: 56px;
+    }
+    .stage-header:hover { background: var(--bg-primary); }
+    .stage-header > * { pointer-events: none; }
+    .stage-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--bg-recessed); display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 500; color: var(--text-secondary); flex-shrink: 0;
+    }
+    .stage.active .stage-num { background: var(--text-primary); color: #fff; }
+    .stage.completed .stage-num { background: var(--green); color: #fff; }
+    .stage.completed .stage-num::after { content: ''; display: none; }
+    .stage.completed .stage-title { color: var(--text-muted); }
+    .stage.completed { box-shadow: var(--shadow-medium), inset 3px 0 0 var(--green); }
+    .stage-title { flex: 1; font-size: 14px; font-weight: 500; letter-spacing: -0.2px; }
+    .stage-chevron {
+      width: 16px; height: 16px; color: var(--text-muted);
+      transition: transform 0.2s ease; flex-shrink: 0;
+    }
+    .stage.open .stage-chevron { transform: rotate(180deg); }
+
+    .stage-body { display: none; padding: var(--space-6); padding-top: var(--space-2); }
+    .stage.open .stage-body { display: block; }
+
+    /* Sections & labels */
+    .section-label {
+      font-size: 11px; font-weight: 500; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin: var(--space-6) 0 var(--space-3);
+    }
+    .stage-body > .section-label:first-child { margin-top: var(--space-2); }
+    .stage-desc {
+      font-size: 14px; color: var(--text-secondary); line-height: 1.6;
+      margin-bottom: var(--space-4);
+    }
+
+    /* Principle/info blocks */
+    .info-block {
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-primary);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-2);
+    }
+    .info-block-title { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+    .info-block-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+    /* Prompt boxes */
+    .prompt {
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-primary);
+      border-left: 3px solid var(--interactive-blue);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-3);
+      font-size: 13px; color: var(--text-secondary); font-style: italic; line-height: 1.5;
+    }
+
+    /* Form fields */
+    .field { margin-bottom: var(--space-4); }
+    .field-label {
+      display: block; font-size: 13px; font-weight: 500;
+      margin-bottom: var(--space-1); color: var(--text-primary);
+    }
+    .field-hint {
+      display: block; font-size: 12px; color: var(--text-muted);
+      margin-bottom: var(--space-2);
+    }
+    textarea, input[type="text"], input[type="number"] {
+      width: 100%; font-family: var(--font-sans); font-size: 14px;
+      padding: var(--space-3); border: none; border-radius: var(--radius);
+      box-shadow: var(--border-shadow); background: var(--bg-elevated);
+      color: var(--text-primary); resize: vertical; line-height: 1.5;
+      transition: box-shadow 0.15s ease;
+    }
+    textarea:focus, input[type="text"]:focus, input[type="number"]:focus {
+      outline: none; box-shadow: 0 0 0 2px var(--interactive-blue);
+    }
+    textarea { min-height: 72px; }
+    textarea.short { min-height: 48px; }
+    textarea.tall { min-height: 120px; }
+
+    /* Inline fields (side by side) */
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+
+    /* Quick checks (still checkboxes for Stage 0) */
+    .check-list { list-style: none; }
+    .check-item {
+      display: flex; align-items: flex-start; gap: var(--space-3);
+      padding: var(--space-2) 0;
+    }
+    .check-item + .check-item { box-shadow: 0 -1px 0 rgba(0,0,0,0.03); }
+    .check-box {
+      width: 18px; height: 18px; border-radius: var(--radius);
+      box-shadow: var(--border-shadow); background: var(--bg-elevated);
+      cursor: pointer; flex-shrink: 0; margin-top: 2px;
+      appearance: none; -webkit-appearance: none;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .check-box:checked { background: var(--text-primary); box-shadow: none; }
+    .check-box:checked::after {
+      content: ''; width: 5px; height: 9px;
+      border: solid white; border-width: 0 1.5px 1.5px 0;
+      transform: rotate(45deg) translateY(-1px);
+    }
+    .check-box:focus { outline: none; box-shadow: var(--focus-ring); }
+    .check-label { font-size: 14px; line-height: 1.5; cursor: pointer; }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-4); box-shadow: 0 -1px 0 rgba(0,0,0,0.04); }
+    .btn {
+      font-family: var(--font-sans); font-size: 14px; font-weight: 500;
+      padding: var(--space-2) var(--space-4); border-radius: var(--radius);
+      cursor: pointer; border: none; transition: background 0.15s, color 0.15s;
+    }
+    .btn:focus { outline: none; box-shadow: var(--focus-ring); }
+    .btn-primary { background: var(--text-primary); color: #fff; }
+    .btn-primary:hover { background: var(--text-secondary); }
+    .btn-complete-done { background: var(--bg-recessed); color: var(--text-secondary); }
+    .btn-complete-done:hover { background: #EBEBEB; color: var(--text-primary); }
+    .btn-ghost { background: transparent; color: var(--text-secondary); }
+    .btn-ghost:hover { background: #EBEBEB; color: var(--text-primary); }
+    .btn-blue { background: var(--interactive-blue); color: #fff; }
+    .btn-blue:hover { background: #005FCC; }
+
+    /* Memo output */
+    .memo-output {
+      background: var(--bg-primary); border-radius: var(--radius);
+      padding: var(--space-6); font-size: 13px; line-height: 1.7;
+      white-space: pre-wrap; word-wrap: break-word;
+      max-height: 600px; overflow-y: auto;
+      box-shadow: var(--border-shadow);
+    }
+    .memo-output h2 { font-size: 14px; font-weight: 600; margin: var(--space-4) 0 var(--space-1); }
+    .memo-output h2:first-child { margin-top: 0; }
+    .memo-output p { margin-bottom: var(--space-2); }
+    .memo-output .empty { color: var(--text-muted); font-style: italic; }
+
+    /* Footer */
+    .footer { max-width: var(--page-width); margin: 0 auto; padding: var(--space-10) var(--space-6); text-align: center; }
+    .footer p { font-size: 12px; color: var(--text-muted); }
+    .footer a { color: var(--interactive-blue); text-decoration: none; }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 28px; letter-spacing: -1px; }
+      .stage-header { padding: var(--space-4); }
+      .stage-body { padding: var(--space-4); padding-top: var(--space-2); }
+      .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <span class="header-title">Clear Thinking</span>
+    <span class="header-subtitle">Decision Framework v2</span>
+  </header>
+
+  <main class="page-layout">
+    <!-- Side Rail (Desktop) -->
+    <nav class="side-rail" id="side-rail" aria-label="Progress">
+      <button class="rail-dot active" data-nav="0" aria-label="Stage 0: Create Space"></button>
+      <div class="rail-connector"></div>
+      <button class="rail-dot" data-nav="1" aria-label="Stage 1: Define the Problem"></button>
+      <div class="rail-connector"></div>
+      <button class="rail-dot" data-nav="2" aria-label="Stage 2: Explore Solutions"></button>
+      <div class="rail-connector"></div>
+      <button class="rail-dot" data-nav="3" aria-label="Stage 3: Evaluate Options"></button>
+      <div class="rail-connector"></div>
+      <button class="rail-dot" data-nav="4" aria-label="Stage 4: Decide & Execute"></button>
+      <div class="rail-connector"></div>
+      <button class="rail-dot" data-nav="5" aria-label="Stage 5: Margin of Safety"></button>
+      <div class="rail-connector"></div>
+      <button class="rail-dot" data-nav="6" aria-label="Stage 6: Learn"></button>
+      <div class="rail-label" id="rail-label">0 / 7</div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main">
+    <section class="hero">
+      <h1>Decision Framework</h1>
+      <p>A structured tool for high-stakes decisions. Each stage requires written output — not checkboxes. The goal is a decision memo you can audit months later.</p>
+    </section>
+
+    <!-- ========== STAGE 0: CREATE SPACE ========== -->
+    <article class="stage open" data-stage="0">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="true">
+        <div class="stage-num">0</div>
+        <div class="stage-title">Create Space</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">Before engaging your rational mind, check whether your biological state and psychological defaults are compromising your judgment. Most bad decisions are made before analysis even starts.</p>
+
+        <div class="section-label">HALT Check</div>
+        <ul class="check-list">
+          <li class="check-item"><input type="checkbox" class="check-box" id="halt-h"><label class="check-label" for="halt-h">I am not <strong>Hungry</strong></label></li>
+          <li class="check-item"><input type="checkbox" class="check-box" id="halt-a"><label class="check-label" for="halt-a">I am not <strong>Angry</strong> or emotionally reactive</label></li>
+          <li class="check-item"><input type="checkbox" class="check-box" id="halt-l"><label class="check-label" for="halt-l">I am not <strong>Lonely</strong>, stressed, or in an unfamiliar environment</label></li>
+          <li class="check-item"><input type="checkbox" class="check-box" id="halt-t"><label class="check-label" for="halt-t">I am not <strong>Tired</strong> or sleep-deprived</label></li>
+        </ul>
+
+        <div class="section-label">Default Scan</div>
+        <ul class="check-list">
+          <li class="check-item"><input type="checkbox" class="check-box" id="def-e"><label class="check-label" for="def-e"><strong>Emotion</strong> — I am not being pushed by fear, anger, or excitement</label></li>
+          <li class="check-item"><input type="checkbox" class="check-box" id="def-g"><label class="check-label" for="def-g"><strong>Ego</strong> — I want the best outcome, not to be right</label></li>
+          <li class="check-item"><input type="checkbox" class="check-box" id="def-s"><label class="check-label" for="def-s"><strong>Social</strong> — I am not conforming just because others are</label></li>
+          <li class="check-item"><input type="checkbox" class="check-box" id="def-i"><label class="check-label" for="def-i"><strong>Inertia</strong> — I am not avoiding change just because it's uncomfortable</label></li>
+        </ul>
+
+        <div class="section-label">Stakes Assessment</div>
+        <div class="field">
+          <label class="field-label" for="s0-stakes">How consequential and reversible is this decision?</label>
+          <span class="field-hint">Low stakes + reversible = decide fast. High stakes + irreversible = slow down and use the full framework.</span>
+          <textarea id="s0-stakes" class="short" data-field="s0-stakes" placeholder="e.g. High stakes, largely irreversible. Affects next 5+ years of career direction. No easy undo once I resign."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary btn-complete" onclick="completeStage(0)">Complete &amp; Continue</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== STAGE 1: DEFINE THE PROBLEM ========== -->
+    <article class="stage" data-stage="1">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="stage-num">1</div>
+        <div class="stage-title">Define the Problem</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">The most critical step. If you solve the wrong problem, nothing else matters. Write in plain language — if you need jargon, you don't understand the problem well enough.</p>
+
+        <div class="info-block">
+          <div class="info-block-title">Definition Principle</div>
+          <div class="info-block-text">Take responsibility for defining the problem yourself. Don't accept the first framing someone else provides.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">Root Cause Principle</div>
+          <div class="info-block-text">Ask: "What would have to be true for this problem not to exist?" If your solution won't pass the test of time, you're treating a symptom.</div>
+        </div>
+
+        <div class="section-label">Written Outputs</div>
+
+        <div class="field">
+          <label class="field-label" for="s1-problem">Problem Statement</label>
+          <span class="field-hint">Max 2 sentences. Plain language. No jargon.</span>
+          <textarea id="s1-problem" class="short" data-field="s1-problem" placeholder="e.g. I've been in my current role for 4 years with no growth path. I need to decide whether to stay, move internally, or leave the company."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s1-why-now">Why Now?</label>
+          <span class="field-hint">What changed or what deadline makes this decision necessary right now?</span>
+          <textarea id="s1-why-now" class="short" data-field="s1-why-now" placeholder="e.g. I received an outside offer that expires in 2 weeks. My current team is being restructured in Q1."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s1-root-cause">Root Cause Hypothesis</label>
+          <span class="field-hint">What is the underlying cause, not the visible symptom?</span>
+          <textarea id="s1-root-cause" class="short" data-field="s1-root-cause" placeholder="e.g. The real issue isn't the role — it's that the company has no path for individual contributors beyond a certain level."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s1-not">What This Problem Is NOT</label>
+          <span class="field-hint">Defining boundaries prevents scope creep and hidden reframings by your defaults.</span>
+          <textarea id="s1-not" class="short" data-field="s1-not" placeholder="e.g. This is not about whether I'm good enough. This is not about short-term compensation. This is not about proving something to my manager."></textarea>
+        </div>
+
+        <div class="section-label">Facts / Assumptions / Unknowns</div>
+        <p class="stage-desc">Separate what you know from what you're guessing. Many bad decisions come from treating speculation as fact, desire as forecast, or possibility as probability.</p>
+
+        <div class="field">
+          <label class="field-label" for="s1-facts">Facts (Verified)</label>
+          <span class="field-hint">What do you know for certain? What has been confirmed by evidence?</span>
+          <textarea id="s1-facts" data-field="s1-facts" placeholder="e.g.&#10;- My current salary is $145k&#10;- The offer is $185k + equity&#10;- My manager confirmed no promotion path this year&#10;- The new company has 18 months of runway"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s1-assumptions">Assumptions (Plausible but Unverified)</label>
+          <span class="field-hint">What do you believe is true but haven't confirmed? Rate your confidence (low/medium/high).</span>
+          <textarea id="s1-assumptions" data-field="s1-assumptions" placeholder="e.g.&#10;- The new role will give me more autonomy (medium confidence)&#10;- My current company won't counter-offer (high confidence)&#10;- The startup will raise Series B within 12 months (low confidence)"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s1-unknowns">Unknowns (Important but Unresolved)</label>
+          <span class="field-hint">What don't you know that could materially change your decision?</span>
+          <textarea id="s1-unknowns" data-field="s1-unknowns" placeholder="e.g.&#10;- What is the new team's actual culture like day-to-day?&#10;- Will the restructuring at my current company create new opportunities?&#10;- How stable is the new company's leadership?"></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary btn-complete" onclick="completeStage(1)">Complete &amp; Continue</button>
+          <button class="btn btn-ghost" onclick="openStage(0)">Back</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== STAGE 2: EXPLORE POSSIBLE SOLUTIONS ========== -->
+    <article class="stage" data-stage="2">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="stage-num">2</div>
+        <div class="stage-title">Explore Possible Solutions</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">Force yourself to generate at least 3 genuine options. Binary thinking (stay or leave, buy or don't) is almost always a sign you haven't explored the problem deeply enough. Include a "do nothing" option and at least one hybrid.</p>
+
+        <div class="info-block">
+          <div class="info-block-title">3+ Principle</div>
+          <div class="info-block-text">If you only see two options, you're trapped. Force a third. Often the real answer is: delay, partial commitment, trial version, combine options, or redefine the objective.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">Second-Level Thinking</div>
+          <div class="info-block-text">For each option ask "And then what?" Your future self wants different choices than your today self. Trace the consequences forward 1, 3, and 5 years.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">Bad Outcome Principle</div>
+          <div class="info-block-text">Don't just imagine the ideal. Imagine what goes wrong and how you recover. Failure to imagine failure is itself a common cause of failure.</div>
+        </div>
+
+        <div class="section-label">Option A</div>
+        <div class="field">
+          <label class="field-label" for="s2-opt-a">Description</label>
+          <textarea id="s2-opt-a" class="short" data-field="s2-opt-a" placeholder="e.g. Accept the outside offer and leave current company"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="s2-opt-a-pro">If it goes well</label>
+            <textarea id="s2-opt-a-pro" class="short" data-field="s2-opt-a-pro" placeholder="Higher comp, faster growth, new network..."></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="s2-opt-a-con">If it goes poorly</label>
+            <textarea id="s2-opt-a-con" class="short" data-field="s2-opt-a-con" placeholder="Startup fails, loss of tenure, culture mismatch..."></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="s2-opt-a-then">And then what? (Second-order effects)</label>
+          <textarea id="s2-opt-a-then" class="short" data-field="s2-opt-a-then" placeholder="If it works: I'll need to build credibility from scratch. If it fails: I'll be job-hunting in 12-18 months with a short stint on my resume."></textarea>
+        </div>
+
+        <div class="section-label">Option B</div>
+        <div class="field">
+          <label class="field-label" for="s2-opt-b">Description</label>
+          <textarea id="s2-opt-b" class="short" data-field="s2-opt-b" placeholder="e.g. Stay and push for an internal transfer to a different team"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="s2-opt-b-pro">If it goes well</label>
+            <textarea id="s2-opt-b-pro" class="short" data-field="s2-opt-b-pro" placeholder="Retain tenure, new growth, known culture..."></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="s2-opt-b-con">If it goes poorly</label>
+            <textarea id="s2-opt-b-con" class="short" data-field="s2-opt-b-con" placeholder="Transfer blocked, same stagnation, missed the outside window..."></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="s2-opt-b-then">And then what?</label>
+          <textarea id="s2-opt-b-then" class="short" data-field="s2-opt-b-then" placeholder=""></textarea>
+        </div>
+
+        <div class="section-label">Option C (or more)</div>
+        <div class="field">
+          <label class="field-label" for="s2-opt-c">Description</label>
+          <textarea id="s2-opt-c" class="short" data-field="s2-opt-c" placeholder="e.g. Negotiate a sabbatical to trial freelancing for 3 months"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="s2-opt-c-pro">If it goes well</label>
+            <textarea id="s2-opt-c-pro" class="short" data-field="s2-opt-c-pro" placeholder=""></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="s2-opt-c-con">If it goes poorly</label>
+            <textarea id="s2-opt-c-con" class="short" data-field="s2-opt-c-con" placeholder=""></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="s2-opt-c-then">And then what?</label>
+          <textarea id="s2-opt-c-then" class="short" data-field="s2-opt-c-then" placeholder=""></textarea>
+        </div>
+
+        <div class="section-label">Do Nothing Option</div>
+        <div class="field">
+          <label class="field-label" for="s2-do-nothing">What happens if I don't decide / maintain status quo?</label>
+          <span class="field-hint">Inaction is itself a decision. What does the future look like if nothing changes?</span>
+          <textarea id="s2-do-nothing" data-field="s2-do-nothing" placeholder="e.g. I stay another year, likely get a cost-of-living raise only, continue to feel stagnant. The outside offer disappears. I'll probably be back in this same position in 12 months but with fewer options."></textarea>
+        </div>
+
+        <div class="section-label">Hybrid / Both-And Option</div>
+        <div class="field">
+          <label class="field-label" for="s2-hybrid">Can I combine elements of multiple options?</label>
+          <span class="field-hint">Instead of Either/Or, explore Both/And. What's the integrative solution?</span>
+          <textarea id="s2-hybrid" data-field="s2-hybrid" placeholder="e.g. Accept the offer but negotiate a 6-week start date. Use that time to explore the internal transfer — if it materializes with the right terms, stay. If not, I leave with a clear conscience."></textarea>
+        </div>
+
+        <div class="section-label">Opportunity Costs</div>
+        <div class="prompt">For your leading option, answer through three lenses:</div>
+        <div class="field">
+          <label class="field-label" for="s2-compared">Compared with what?</label>
+          <textarea id="s2-compared" class="short" data-field="s2-compared" placeholder="What am I giving up by choosing this over the next best alternative?"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label" for="s2-then-what">And then what?</label>
+          <textarea id="s2-then-what" class="short" data-field="s2-then-what" placeholder="What costs will arise after I've chosen? (time, energy, relationships, future flexibility)"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label" for="s2-expense">At the expense of what?</label>
+          <textarea id="s2-expense" class="short" data-field="s2-expense" placeholder="What else could I do with the time, money, or energy this option requires?"></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary btn-complete" onclick="completeStage(2)">Complete &amp; Continue</button>
+          <button class="btn btn-ghost" onclick="openStage(1)">Back</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== STAGE 3: EVALUATE THE OPTIONS ========== -->
+    <article class="stage" data-stage="3">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="stage-num">3</div>
+        <div class="stage-title">Evaluate the Options</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">Apply criteria to your options with rigor. Get high-quality information from sources close to the problem. Quantify where possible — vague criteria produce vague decisions.</p>
+
+        <div class="info-block">
+          <div class="info-block-title">Targeting Principle</div>
+          <div class="info-block-text">Know what you're looking for before sorting through data. Most information is irrelevant. Identify the variables that probabilistically govern the outcome.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">HiFi Principle</div>
+          <div class="info-block-text">Get information close to the source, unfiltered by other people's biases. The person closest to the problem has the most accurate info — what they lack is broader perspective.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">HiEx Principle</div>
+          <div class="info-block-text">Seek people who recently solved a similar problem. Ask how they think, not what to do. Ask: "What variables would you use? What do most people miss?"</div>
+        </div>
+
+        <div class="section-label">Criteria &amp; Ranking</div>
+        <div class="field">
+          <label class="field-label" for="s3-criteria">List your evaluation criteria (in order of importance)</label>
+          <span class="field-hint">Write one per line. The top one is your single most important criterion. If you can't pick one, you haven't thought hard enough.</span>
+          <textarea id="s3-criteria" class="tall" data-field="s3-criteria" placeholder="e.g.&#10;1. Learning velocity (most important) — will I grow faster here?&#10;2. Financial upside — total comp over 3 years, including equity&#10;3. Autonomy — can I own decisions without layers of approval?&#10;4. Team quality — will I work with people better than me?&#10;5. Schedule flexibility — can I be present for my family?"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s3-boundary">Decision Boundary / Threshold</label>
+          <span class="field-hint">At what point does your top criterion flip the decision? Define the number or condition.</span>
+          <textarea id="s3-boundary" class="short" data-field="s3-boundary" placeholder="e.g. If learning velocity is equal between options, then financial upside above $40k/year difference tips it. Below that, I optimize for autonomy."></textarea>
+        </div>
+
+        <div class="section-label">Base Rate / Reference Class</div>
+        <p class="stage-desc">Before trusting your narrative, check what usually happens to people in this situation. Base rates ground your expectations in reality rather than optimism.</p>
+
+        <div class="field">
+          <label class="field-label" for="s3-class">What class of decision is this?</label>
+          <span class="field-hint">Name the reference class. e.g. "Mid-career professionals leaving stable jobs for startups"</span>
+          <textarea id="s3-class" class="short" data-field="s3-class" placeholder="e.g. Experienced ICs joining early-stage startups (Series A, 20-50 employees)"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s3-base-rate">What usually happens in this class?</label>
+          <span class="field-hint">Failure rate, median outcome, typical timeline to success, common failure modes.</span>
+          <textarea id="s3-base-rate" data-field="s3-base-rate" placeholder="e.g.&#10;- ~60% of Series A startups fail before Series C&#10;- Median time to liquidity event: 7-10 years&#10;- Most common failure mode: product-market fit never materializes&#10;- People who leave stable jobs for startups report higher satisfaction even when it fails, but 30% return to corporate within 2 years"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s3-different">Why do I think my case is different?</label>
+          <span class="field-hint">Be honest: is this belief evidence-based or ego-based? What specific evidence supports your exceptionalism?</span>
+          <textarea id="s3-different" class="short" data-field="s3-different" placeholder="e.g. The company already has $2M ARR and positive unit economics — it's past the 'will anyone pay for this' phase. But I might be overweighting the founder's pitch."></textarea>
+        </div>
+
+        <div class="section-label">Information Quality</div>
+        <div class="field">
+          <label class="field-label" for="s3-expert">Expert Input</label>
+          <span class="field-hint">Who did you consult? What did they say? How recently did they solve a similar problem?</span>
+          <textarea id="s3-expert" data-field="s3-expert" placeholder="e.g. Spoke to two people who joined startups at similar stages:&#10;- Person A (joined 2 years ago): 'The learning curve is real but worth it. Ask about decision-making speed in the interview.'&#10;- Person B (joined 4 years ago, company failed): 'Check the burn rate and ask for the board deck. Founders always oversell runway.'"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s3-unknown">Biggest Unknown</label>
+          <span class="field-hint">What single piece of missing information would most change your decision if you had it?</span>
+          <textarea id="s3-unknown" class="short" data-field="s3-unknown" placeholder="e.g. Whether the startup's Q4 revenue numbers are organic growth or driven by a one-time deal that won't repeat."></textarea>
+        </div>
+
+        <div class="section-label">Confidence Calibration</div>
+        <div class="field">
+          <label class="field-label" for="s3-confidence">How confident am I in my leading option, and why?</label>
+          <span class="field-hint">Express as a percentage. If above 90%, ask: what am I not seeing? If below 60%, ask: what more do I need?</span>
+          <textarea id="s3-confidence" class="short" data-field="s3-confidence" placeholder="e.g. 70% confident in taking the offer. Main uncertainty: whether the team culture will actually match what I saw in interviews. I'm weighting the positives because I want to leave."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary btn-complete" onclick="completeStage(3)">Complete &amp; Continue</button>
+          <button class="btn btn-ghost" onclick="openStage(2)">Back</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== STAGE 4: DECIDE AND EXECUTE ========== -->
+    <article class="stage" data-stage="4">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="stage-num">4</div>
+        <div class="stage-title">Decide and Execute</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">You've evaluated the options. Now commit. There is no purpose to knowing what you should do and not doing it. Make the judgment, write it down, and define the execution path.</p>
+
+        <div class="info-block">
+          <div class="info-block-title">Stop, FLOP, Know</div>
+          <div class="info-block-text"><strong>Stop</strong> gathering when you've stopped learning new things. <strong>FLOP</strong> — act before your First Lost OPportunity. <strong>Know</strong> — act when a critical piece of information makes it obvious.</div>
+        </div>
+
+        <div class="section-label">The Decision</div>
+        <div class="field">
+          <label class="field-label" for="s4-decision">What is your decision? State it clearly.</label>
+          <span class="field-hint">One sentence. Unambiguous. Someone else should be able to read this and know exactly what you're doing.</span>
+          <textarea id="s4-decision" class="short" data-field="s4-decision" placeholder="e.g. I am accepting the offer at Company X and resigning from my current role by March 15."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s4-why">Why this option over the others?</label>
+          <span class="field-hint">Reference your top criterion and decision boundary from Stage 3.</span>
+          <textarea id="s4-why" data-field="s4-why" placeholder="e.g. Learning velocity is highest at Company X (new domain, smaller team, more ownership). Financial upside exceeds my $40k threshold. The do-nothing option leads to stagnation I've already experienced for 18 months."></textarea>
+        </div>
+
+        <div class="section-label">Execution</div>
+        <div class="field">
+          <label class="field-label" for="s4-first-action">First concrete action</label>
+          <span class="field-hint">What is the very next thing you will physically do? Make it specific and time-bound.</span>
+          <textarea id="s4-first-action" class="short" data-field="s4-first-action" placeholder="e.g. Email recruiter accepting the offer by end of day today. Schedule resignation conversation with manager for Thursday morning."></textarea>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="s4-deadline">Decision deadline</label>
+            <input type="text" id="s4-deadline" data-field="s4-deadline" placeholder="e.g. March 10, 2025">
+          </div>
+          <div class="field">
+            <label class="field-label" for="s4-announce">Announce by</label>
+            <input type="text" id="s4-announce" data-field="s4-announce" placeholder="e.g. March 12, 2025">
+          </div>
+        </div>
+
+        <div class="section-label">Pre-Commitment Check</div>
+        <p class="stage-desc">After reflection, do you still endorse this decision across logic, emotion, and lived intuition — while recognizing that discomfort alone is not disproof?</p>
+
+        <div class="field">
+          <label class="field-label" for="s4-reflection">Overnight reflection</label>
+          <span class="field-hint">Write your reasoning tonight. Re-read it tomorrow. Does it still hold up in the morning? Note what changed or what still feels off.</span>
+          <textarea id="s4-reflection" data-field="s4-reflection" placeholder="e.g. Slept on it. Still feels right. The discomfort I feel is fear of the unknown, not a signal that the decision is wrong. Logic and intuition are aligned. The only doubt: leaving colleagues I respect — but that's an emotional cost I'm willing to bear, not a reason to stay."></textarea>
+        </div>
+
+        <div class="section-label">Execution Fail-Safes</div>
+
+        <div class="field">
+          <label class="field-label" for="s4-tripwire">Trip Wire</label>
+          <span class="field-hint">Define in advance: "If [condition] by [date], I will [action]." No renegotiating in the moment.</span>
+          <textarea id="s4-tripwire" data-field="s4-tripwire" placeholder="e.g. If I haven't received the signed offer letter by March 8, I withdraw and pursue the internal transfer. If by 90 days into the new role I'm not owning at least one major initiative, I escalate with my manager."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s4-change-mind">What would change my mind?</label>
+          <span class="field-hint">Name the specific conditions under which you'd reverse this decision. If nothing would change your mind, you're not deciding — you're rationalizing.</span>
+          <textarea id="s4-change-mind" data-field="s4-change-mind" placeholder="e.g. I would reverse if:&#10;- The startup's burn rate is higher than represented (ask for financials)&#10;- My current company counter-offers with a genuine leadership role (not just money)&#10;- Due diligence reveals the founding team has a pattern of overpromising"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s4-commander">Commander's Intent</label>
+          <span class="field-hint">If someone else needs to make decisions on your behalf during execution, what's the single most important thing they should optimize for?</span>
+          <textarea id="s4-commander" class="short" data-field="s4-commander" placeholder="e.g. Optimize for learning and ownership. Accept lower short-term comfort if it means faster skill development."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary btn-complete" onclick="completeStage(4)">Complete &amp; Continue</button>
+          <button class="btn btn-ghost" onclick="openStage(3)">Back</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== STAGE 5: MARGIN OF SAFETY ========== -->
+    <article class="stage" data-stage="5">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="stage-num">5</div>
+        <div class="stage-title">Margin of Safety</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">When failure is expensive, invest in margins of safety. You need a margin of safety most at the very moment you start to think you don't. Prepare for the future — don't predict it.</p>
+
+        <div class="info-block">
+          <div class="info-block-title">Baseline Rule</div>
+          <div class="info-block-text">Your margin of safety should absorb double the worst-case scenario. If your worst case takes 6 months to recover from, prepare for 12.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">Bullets Before Cannonballs</div>
+          <div class="info-block-text">Take small, low-risk steps toward multiple options before committing everything to one. Calibrate with cheap experiments, then fire the cannonball.</div>
+        </div>
+
+        <div class="section-label">Quantified Risk Assessment</div>
+
+        <div class="field">
+          <label class="field-label" for="s5-worst-case">Estimated worst-case scenario</label>
+          <span class="field-hint">Be specific: dollars, months, reputation damage, opportunity cost. Not "things go badly" — quantify it.</span>
+          <textarea id="s5-worst-case" data-field="s5-worst-case" placeholder="e.g.&#10;- Financial: 6 months without income if startup fails immediately ($45k burn)&#10;- Career: short stint looks bad, 3-4 months to find equivalent role&#10;- Reputation: minimal — leaving for a startup is normalized in my industry&#10;- Total recovery time: ~9 months worst case"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s5-doubled">Doubled worst case</label>
+          <span class="field-hint">Double every number above. Can you survive this? If not, your margin is insufficient.</span>
+          <textarea id="s5-doubled" class="short" data-field="s5-doubled" placeholder="e.g. 12 months without income ($90k burn), 6-8 months job search. Current savings: $120k. Survival: yes, uncomfortable but not catastrophic."></textarea>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="s5-buffer">Current buffer / reserves</label>
+            <input type="text" id="s5-buffer" data-field="s5-buffer" placeholder="e.g. $120k savings, 14 months runway">
+          </div>
+          <div class="field">
+            <label class="field-label" for="s5-survival">Survival probability if wrong</label>
+            <input type="text" id="s5-survival" data-field="s5-survival" placeholder="e.g. 95% — I can recover financially">
+          </div>
+        </div>
+
+        <div class="section-label">Risk Mitigation</div>
+
+        <div class="field">
+          <label class="field-label" for="s5-experiment">Cheap experiment before full commitment</label>
+          <span class="field-hint">What small, low-risk step could you take to validate your assumptions before going all in?</span>
+          <textarea id="s5-experiment" data-field="s5-experiment" placeholder="e.g. Ask for a 1-day shadow / ride-along before my start date. Request the company's board deck and financials during negotiation. Talk to 2 recently departed employees."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s5-recovery">Recovery plan if it fails</label>
+          <span class="field-hint">What specifically will you do if the worst case materializes? Write the plan now while you're calm and clear-headed.</span>
+          <textarea id="s5-recovery" data-field="s5-recovery" placeholder="e.g.&#10;1. If company fails in <12 months: activate network immediately, target 3 companies I'd want to join&#10;2. Maintain relationships at current company (don't burn bridges on exit)&#10;3. Keep $80k untouched as emergency fund throughout&#10;4. If no role in 4 months: take contract work to extend runway"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s5-turkey">Am I the turkey?</label>
+          <span class="field-hint">Is a pattern continuing just because it hasn't broken yet? What could disrupt the trend I'm relying on?</span>
+          <textarea id="s5-turkey" class="short" data-field="s5-turkey" placeholder="e.g. The startup's revenue growth looks great, but it's only 3 quarters of data. The market could shift. I might be pattern-matching on a sample too small to be meaningful."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary btn-complete" onclick="completeStage(5)">Complete &amp; Continue</button>
+          <button class="btn btn-ghost" onclick="openStage(4)">Back</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== STAGE 6: LEARN FROM THE DECISION ========== -->
+    <article class="stage" data-stage="6">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="stage-num">6</div>
+        <div class="stage-title">Learn from the Decision</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">Come back to this stage after the outcome is known. Judge the quality of your decision by your process, not the result. A good decision can have a bad outcome (bad luck), and a bad decision can have a good outcome (good luck). Only by reviewing your reasoning can you separate skill from chance.</p>
+
+        <div class="info-block">
+          <div class="info-block-title">Process Principle</div>
+          <div class="info-block-text">Evaluate the process you used, not the outcome. Confidence increases faster than accuracy — more data makes us feel sure without making us more right.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">Transparency Principle</div>
+          <div class="info-block-text">Your ego distorts memory. Only written records are reliable. That's why you wrote everything down in the stages above.</div>
+        </div>
+
+        <div class="section-label">Outcome Review</div>
+        <div class="field">
+          <label class="field-label" for="s6-expected">What did I expect to happen?</label>
+          <span class="field-hint">Copy from your earlier stages — what outcome were you anticipating and on what timeline?</span>
+          <textarea id="s6-expected" data-field="s6-expected" placeholder="e.g. Expected: within 6 months I'd be owning a product area, learning new domain rapidly, earning more, and feeling energized by the work."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s6-actual">What actually happened?</label>
+          <span class="field-hint">Be factual. What was the actual outcome? What timeline did it follow?</span>
+          <textarea id="s6-actual" data-field="s6-actual" placeholder="e.g. Actual: The role delivered on comp and learning. But the product area was deprioritized at month 4 and I was reassigned. Culture was more chaotic than expected."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s6-reasons">Did it happen for the reasons I expected?</label>
+          <span class="field-hint">Were my causal models correct? Did I predict the mechanism, or just get lucky/unlucky?</span>
+          <textarea id="s6-reasons" class="short" data-field="s6-reasons" placeholder="e.g. Partially. The learning was real (predicted correctly). The deprioritization was not — I underweighted the risk of early-stage strategic pivots. My assumption about product stability was wrong."></textarea>
+        </div>
+
+        <div class="section-label">Process Grade</div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="s6-process-grade">Process quality (A-F)</label>
+            <input type="text" id="s6-process-grade" data-field="s6-process-grade" placeholder="e.g. B+">
+          </div>
+          <div class="field">
+            <label class="field-label" for="s6-outcome-grade">Outcome quality (A-F)</label>
+            <input type="text" id="s6-outcome-grade" data-field="s6-outcome-grade" placeholder="e.g. B-">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s6-luck">Luck vs. Skill Assessment</label>
+          <span class="field-hint">How much of the outcome was due to your process vs. factors beyond your control?</span>
+          <textarea id="s6-luck" class="short" data-field="s6-luck" placeholder="e.g. The good parts (comp, learning) were predictable from my process. The bad part (deprioritization) was genuinely unpredictable — no amount of diligence would have caught an internal strategic shift 4 months out. Mostly skill, some bad luck."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="s6-lesson">Key lesson for next time</label>
+          <span class="field-hint">What will you do differently in your next major decision based on this experience?</span>
+          <textarea id="s6-lesson" data-field="s6-lesson" placeholder="e.g.&#10;1. Ask startups about their strategic planning horizon and how often priorities shift&#10;2. Weight 'stability of role scope' as a criterion next time&#10;3. My base rate check was right — startups do pivot frequently. I should have taken that more seriously instead of assuming my situation was different."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary btn-complete" onclick="completeStage(6)">Complete</button>
+          <button class="btn btn-ghost" onclick="openStage(5)">Back</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== DECISION MEMO ========== -->
+    <article class="stage" data-stage="memo">
+      <div class="stage-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="stage-num" style="background: var(--interactive-blue); color: #fff;">M</div>
+        <div class="stage-title">Decision Memo</div>
+        <svg class="stage-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+      </div>
+      <div class="stage-body">
+        <p class="stage-desc">This memo compiles all your written outputs into a single structured document. Copy it, save it, share it. Come back in 6 months to complete Stage 6.</p>
+
+        <div class="btn-row" style="margin-top: 0; padding-top: 0; box-shadow: none;">
+          <button class="btn btn-blue" onclick="generateMemo()">Generate Memo</button>
+          <button class="btn btn-ghost" onclick="copyMemo()">Copy to Clipboard</button>
+          <button class="btn btn-ghost" onclick="resetAll()">Reset All</button>
+        </div>
+
+        <div id="memo-container" class="memo-output" style="margin-top: var(--space-6); display: none;"></div>
+      </div>
+    </article>
+
+    </div><!-- /.main -->
+  </main>
+
+  <!-- Mobile Tracker (horizontal, sticky below header) -->
+  <nav class="mobile-tracker" id="mobile-tracker" aria-label="Progress">
+    <button class="mobile-dot active" data-nav="0" aria-label="Stage 0"></button>
+    <div class="mobile-connector"></div>
+    <button class="mobile-dot" data-nav="1" aria-label="Stage 1"></button>
+    <div class="mobile-connector"></div>
+    <button class="mobile-dot" data-nav="2" aria-label="Stage 2"></button>
+    <div class="mobile-connector"></div>
+    <button class="mobile-dot" data-nav="3" aria-label="Stage 3"></button>
+    <div class="mobile-connector"></div>
+    <button class="mobile-dot" data-nav="4" aria-label="Stage 4"></button>
+    <div class="mobile-connector"></div>
+    <button class="mobile-dot" data-nav="5" aria-label="Stage 5"></button>
+    <div class="mobile-connector"></div>
+    <button class="mobile-dot" data-nav="6" aria-label="Stage 6"></button>
+  </nav>
+
+  <footer class="footer">
+  </footer>
+
+  <script>
+    // ===== STATE =====
+    const STAGES = 7;
+    const STORAGE_KEY = 'ct-framework-v2';
+    let state = loadState();
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      } catch(e) {}
+      return { fields: {}, completed: [] };
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    // ===== INIT =====
+    document.addEventListener('DOMContentLoaded', () => {
+      // Restore field values
+      document.querySelectorAll('[data-field]').forEach(el => {
+        const key = el.dataset.field;
+        if (state.fields[key]) el.value = state.fields[key];
+      });
+
+      // Restore checkboxes
+      document.querySelectorAll('.check-box').forEach(cb => {
+        if (state.fields[cb.id]) cb.checked = true;
+      });
+
+      // Restore completed stages
+      state.completed.forEach(i => {
+        const stage = document.querySelector(`[data-stage="${i}"]`);
+        if (stage) {
+          stage.classList.add('completed');
+          const btn = stage.querySelector('.btn-complete');
+          if (btn) {
+            btn.textContent = 'Undo Complete';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-complete-done');
+          }
+        }
+      });
+
+      // Auto-save on input
+      document.querySelectorAll('[data-field]').forEach(el => {
+        el.addEventListener('input', () => {
+          state.fields[el.dataset.field] = el.value;
+          saveState();
+        });
+      });
+
+      document.querySelectorAll('.check-box').forEach(cb => {
+        cb.addEventListener('change', () => {
+          state.fields[cb.id] = cb.checked;
+          saveState();
+        });
+      });
+
+      // Stage header toggle
+      document.querySelectorAll('.stage-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleStage(header);
+          updateDots();
+        });
+        header.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleStage(header);
+            updateDots();
+          }
+        });
+      });
+
+      // Dot navigation click handlers
+      document.querySelectorAll('[data-nav]').forEach(dot => {
+        dot.addEventListener('click', () => {
+          const idx = parseInt(dot.dataset.nav);
+          openStage(idx);
+          updateDots();
+        });
+      });
+
+      updateProgress();
+    });
+
+    // ===== STAGE NAVIGATION =====
+    function toggleStage(header) {
+      const stage = header.closest('.stage');
+      const isOpen = stage.classList.contains('open');
+      if (isOpen) {
+        stage.classList.remove('open');
+        header.setAttribute('aria-expanded', 'false');
+      } else {
+        stage.classList.add('open');
+        header.setAttribute('aria-expanded', 'true');
+      }
+    }
+
+    function openStage(index) {
+      document.querySelectorAll('.stage').forEach(s => {
+        s.classList.remove('open');
+        s.querySelector('.stage-header').setAttribute('aria-expanded', 'false');
+      });
+      const selector = `[data-stage="${index}"]`;
+      const target = document.querySelector(selector);
+      if (target) {
+        target.classList.add('open');
+        target.querySelector('.stage-header').setAttribute('aria-expanded', 'true');
+        setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      }
+      updateDots();
+    }
+
+    function completeStage(index) {
+      const stage = document.querySelector(`[data-stage="${index}"]`);
+      const btn = stage.querySelector('.btn-complete');
+      if (state.completed.includes(index)) {
+        // Uncomplete
+        state.completed = state.completed.filter(i => i !== index);
+        if (stage) stage.classList.remove('completed');
+        if (btn) {
+          btn.textContent = 'Complete & Continue';
+          btn.classList.remove('btn-complete-done');
+          btn.classList.add('btn-primary');
+        }
+        saveState();
+        updateProgress();
+      } else {
+        // Complete
+        state.completed.push(index);
+        if (stage) stage.classList.add('completed');
+        if (btn) {
+          btn.textContent = 'Undo Complete';
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-complete-done');
+        }
+        saveState();
+        updateProgress();
+        // Open next stage
+        if (index < STAGES - 1) {
+          openStage(index + 1);
+        } else {
+          openStage('memo');
+        }
+      }
+    }
+
+    function updateProgress() {
+      const count = state.completed.length;
+      // Update rail label
+      const label = document.getElementById('rail-label');
+      if (label) label.textContent = `${count} / ${STAGES}`;
+
+      // Update dots and connectors
+      updateDots();
+    }
+
+    function updateDots() {
+      // Find which stage is currently open
+      const openStageEl = document.querySelector('.stage.open');
+      const activeIndex = openStageEl ? parseInt(openStageEl.dataset.stage) : -1;
+
+      // Desktop rail dots
+      document.querySelectorAll('.rail-dot').forEach(dot => {
+        const idx = parseInt(dot.dataset.nav);
+        dot.classList.remove('active', 'completed');
+        if (state.completed.includes(idx)) {
+          dot.classList.add('completed');
+        } else if (idx === activeIndex) {
+          dot.classList.add('active');
+        }
+      });
+
+      // Desktop connectors
+      document.querySelectorAll('.rail-connector').forEach((conn, i) => {
+        conn.classList.toggle('completed', state.completed.includes(i));
+      });
+
+      // Mobile dots
+      document.querySelectorAll('.mobile-dot').forEach(dot => {
+        const idx = parseInt(dot.dataset.nav);
+        dot.classList.remove('active', 'completed');
+        if (state.completed.includes(idx)) {
+          dot.classList.add('completed');
+        } else if (idx === activeIndex) {
+          dot.classList.add('active');
+        }
+      });
+
+      // Mobile connectors
+      document.querySelectorAll('.mobile-connector').forEach((conn, i) => {
+        conn.classList.toggle('completed', state.completed.includes(i));
+      });
+    }
+
+    // ===== MEMO GENERATION =====
+    function getField(key) {
+      return (state.fields[key] || '').trim();
+    }
+
+    function generateMemo() {
+      const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      let memo = `DECISION MEMO\nGenerated: ${date}\n${'='.repeat(50)}\n\n`;
+
+      // 1. Decision
+      memo += `## 1. DECISION\n`;
+      memo += field('Decision', 's4-decision');
+      memo += field('Date / Deadline', 's4-deadline');
+      memo += '\n';
+
+      // 2. Why Now
+      memo += `## 2. WHY NOW\n`;
+      memo += field('Trigger', 's1-why-now');
+      memo += '\n';
+
+      // 3. Problem Definition
+      memo += `## 3. PROBLEM DEFINITION\n`;
+      memo += field('Problem Statement', 's1-problem');
+      memo += field('Root Cause', 's1-root-cause');
+      memo += field('What This Is NOT', 's1-not');
+      memo += '\n';
+
+      // 4. Facts / Assumptions / Unknowns
+      memo += `## 4. FACTS / ASSUMPTIONS / UNKNOWNS\n`;
+      memo += field('Facts (Verified)', 's1-facts');
+      memo += field('Assumptions (Unverified)', 's1-assumptions');
+      memo += field('Unknowns (Unresolved)', 's1-unknowns');
+      memo += '\n';
+
+      // 5. Options Considered
+      memo += `## 5. OPTIONS CONSIDERED\n`;
+      memo += field('Option A', 's2-opt-a');
+      if (getField('s2-opt-a-pro')) memo += `  If it goes well: ${getField('s2-opt-a-pro')}\n`;
+      if (getField('s2-opt-a-con')) memo += `  If it goes poorly: ${getField('s2-opt-a-con')}\n`;
+      if (getField('s2-opt-a-then')) memo += `  Then what: ${getField('s2-opt-a-then')}\n`;
+      memo += field('Option B', 's2-opt-b');
+      if (getField('s2-opt-b-pro')) memo += `  If it goes well: ${getField('s2-opt-b-pro')}\n`;
+      if (getField('s2-opt-b-con')) memo += `  If it goes poorly: ${getField('s2-opt-b-con')}\n`;
+      if (getField('s2-opt-b-then')) memo += `  Then what: ${getField('s2-opt-b-then')}\n`;
+      memo += field('Option C', 's2-opt-c');
+      if (getField('s2-opt-c-pro')) memo += `  If it goes well: ${getField('s2-opt-c-pro')}\n`;
+      if (getField('s2-opt-c-con')) memo += `  If it goes poorly: ${getField('s2-opt-c-con')}\n`;
+      if (getField('s2-opt-c-then')) memo += `  Then what: ${getField('s2-opt-c-then')}\n`;
+      memo += field('Do Nothing', 's2-do-nothing');
+      memo += field('Hybrid Option', 's2-hybrid');
+      memo += '\n';
+
+      // 6. Evaluation Criteria
+      memo += `## 6. EVALUATION CRITERIA\n`;
+      memo += field('Criteria (ranked)', 's3-criteria');
+      memo += field('Decision Boundary', 's3-boundary');
+      memo += field('Confidence Level', 's3-confidence');
+      memo += '\n';
+
+      // 7. Base Rate / Reference Class
+      memo += `## 7. BASE RATE / REFERENCE CLASS\n`;
+      memo += field('Reference Class', 's3-class');
+      memo += field('What Usually Happens', 's3-base-rate');
+      memo += field('Why My Case Is Different', 's3-different');
+      memo += '\n';
+
+      // 8. Key Assumptions & Expert Input
+      memo += `## 8. INFORMATION SOURCES\n`;
+      memo += field('Expert Input', 's3-expert');
+      memo += field('Biggest Unknown', 's3-unknown');
+      memo += '\n';
+
+      // 9. Reasoning
+      memo += `## 9. REASONING\n`;
+      memo += field('Why This Option', 's4-why');
+      memo += field('Overnight Reflection', 's4-reflection');
+      memo += '\n';
+
+      // 10. Risk & Margin of Safety
+      memo += `## 10. RISK & MARGIN OF SAFETY\n`;
+      memo += field('Worst Case (quantified)', 's5-worst-case');
+      memo += field('Doubled Worst Case', 's5-doubled');
+      memo += field('Buffer / Reserves', 's5-buffer');
+      memo += field('Survival Probability', 's5-survival');
+      memo += field('Cheap Experiment', 's5-experiment');
+      memo += field('Recovery Plan', 's5-recovery');
+      memo += '\n';
+
+      // 11. Execution
+      memo += `## 11. EXECUTION\n`;
+      memo += field('First Action', 's4-first-action');
+      memo += field('Announce By', 's4-announce');
+      memo += field('Commander\'s Intent', 's4-commander');
+      memo += '\n';
+
+      // 12. Trip Wires & Reversibility
+      memo += `## 12. TRIP WIRES & REVERSIBILITY\n`;
+      memo += field('Trip Wire', 's4-tripwire');
+      memo += field('What Would Change My Mind', 's4-change-mind');
+      memo += '\n';
+
+      // 13. Post-Decision Review (if completed)
+      if (getField('s6-actual') || getField('s6-lesson')) {
+        memo += `## 13. POST-DECISION REVIEW\n`;
+        memo += field('Expected Outcome', 's6-expected');
+        memo += field('Actual Outcome', 's6-actual');
+        memo += field('Happened for Expected Reasons?', 's6-reasons');
+        memo += field('Process Grade', 's6-process-grade');
+        memo += field('Outcome Grade', 's6-outcome-grade');
+        memo += field('Luck vs Skill', 's6-luck');
+        memo += field('Key Lesson', 's6-lesson');
+        memo += '\n';
+      }
+
+      memo += `${'='.repeat(50)}\nEnd of memo.\n`;
+
+      // Display
+      const container = document.getElementById('memo-container');
+      container.style.display = 'block';
+      container.textContent = memo;
+    }
+
+    function field(label, key) {
+      const val = getField(key);
+      if (!val) return `${label}: (not completed)\n`;
+      return `${label}:\n${val}\n\n`;
+    }
+
+    function copyMemo() {
+      const container = document.getElementById('memo-container');
+      if (!container.textContent) {
+        generateMemo();
+      }
+      navigator.clipboard.writeText(container.textContent).then(() => {
+        const btn = event.target;
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = original, 2000);
+      }).catch(() => {
+        // Fallback for older browsers
+        const range = document.createRange();
+        range.selectNode(container);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('copy');
+        window.getSelection().removeAllRanges();
+      });
+    }
+
+    // ===== RESET =====
+    function resetAll() {
+      if (!confirm('This will permanently delete all your inputs. Are you sure?')) return;
+      state = { fields: {}, completed: [] };
+      localStorage.removeItem(STORAGE_KEY);
+      document.querySelectorAll('[data-field]').forEach(el => el.value = '');
+      document.querySelectorAll('.check-box').forEach(cb => cb.checked = false);
+      document.querySelectorAll('.stage').forEach(s => s.classList.remove('completed'));
+      document.getElementById('memo-container').style.display = 'none';
+      document.getElementById('memo-container').textContent = '';
+      updateProgress();
+      openStage(0);
+    }
+  </script>
+</body>
+</html>
