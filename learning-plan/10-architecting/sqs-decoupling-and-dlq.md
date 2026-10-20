@@ -18,6 +18,8 @@ tags:
 > (the module lists "decoupling (SQS/SNS)" directly).
 > Related: [[learning-plan/04-networking/load-balancers|Load balancers]]
 > (the other "don't talk directly" pattern) ·
+> [[learning-plan/10-architecting/sns-vs-sqs-vs-eventbridge|SQS vs SNS vs EventBridge]]
+> (when to use a queue vs broadcast vs router) ·
 > [[learning-plan/01-cloud-foundations/elasticity-and-flexible-capacity|Elasticity]]
 
 Amazon SQS (Simple Queue Service) is a **fully managed message queue** that sits
@@ -308,6 +310,51 @@ Use **Standard** for maximum throughput when occasional reordering/duplication i
 tolerable (and consumers are idempotent). Use **FIFO** when order or
 no-duplicates genuinely matters (e.g. financial transaction sequencing). This
 course/project uses **Standard**.
+
+## SQS tuning & limits (long polling, batching, message size)
+
+Three operational knobs/limits the decoupling story above doesn't need but a real
+deployment does — each is a cheap win or a hard constraint.
+
+### Long polling — stop the empty-receive busy-loop
+
+By default `ReceiveMessage` does **short polling**: it returns immediately, often
+with **no messages** even when some exist (it samples a subset of servers). A
+worker loop then hammers the API with mostly-empty receives — wasteful requests
+(SQS is priced **per request**) and needless latency.
+
+**Long polling** fixes it: set **`WaitTimeSeconds`** (1–20) so the receive call
+**waits** up to that long for a message to arrive before returning empty.
+
+| | Short polling (`WaitTimeSeconds=0`) | Long polling (`WaitTimeSeconds=20`) |
+| --- | --- | --- |
+| Empty receives | Many (busy-loop) | Few |
+| API cost | Higher (per-request) | Lower |
+| Latency to pick up a message | Can be worse | Better (returns the instant one lands) |
+
+> **Rule:** enable long polling almost always — set `WaitTimeSeconds=20` (the max)
+> on the queue (`ReceiveMessageWaitTimeSeconds`) or per-receive. It lowers cost
+> **and** latency at once; there's rarely a reason not to.
+
+### Batching — up to 10 messages per call
+
+`SendMessage`/`ReceiveMessage`/`DeleteMessage` each have a **batch form**
+(`SendMessageBatch`, etc.) handling **up to 10 messages per API call**. Since SQS
+bills per request, batching cuts request cost up to ~**10×** at volume, and lifts
+effective throughput. The video's one-message-at-a-time model is fine
+conceptually; batch in production when volume is real.
+
+### Message size — 256 KB cap → pass a pointer, not the payload
+
+A single SQS message is capped at **256 KB**. So you **never put the payload
+(the video, the image, the big blob) in the message** — you put a **pointer** to
+it (the S3 object key) and let the consumer fetch it from S3. This is exactly what
+the S3→SQS wiring above does: the event carries the bucket/key, not the file.
+
+> For metadata that genuinely exceeds 256 KB, the **SQS Extended Client Library**
+> stores the payload in S3 and puts an S3 pointer in the message automatically —
+> same "reference not payload" principle, handled for you. Rule of thumb: **queue
+> carries references; S3 carries bytes.**
 
 ## Where this shows up in projects
 
