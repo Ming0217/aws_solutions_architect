@@ -13,7 +13,7 @@ services:
   - cloudfront
   - cloudwatch
   - iam
-status: design
+status: phase1-deployed-and-validated
 tags:
   - aws
   - project

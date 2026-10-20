@@ -18,6 +18,7 @@ Use [[templates/project-note|the project template]] for new entries.
 
 - [[projects/photoshare-app|PhotoShare — Instagram-style photo sharing app]]
 - [[projects/clear-thinking-app|Clear Thinking — AI-assisted decision framework]]
+- [[projects/video-streaming-app|Video Streaming Platform — event-driven ingest, transcode & HLS]]
 
 ## Dataview: all projects
 
