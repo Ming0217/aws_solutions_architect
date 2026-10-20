@@ -131,6 +131,167 @@ How this plays out per identity type:
 > console UI makes it *look* like attaching, but under the hood it's an instance
 > profile wrapping the same assume-role mechanism.
 
+## Trust type: "AWS account / This account" (a human assuming a role)
+
+The trust types above were a **service** principal (`ec2.amazonaws.com`). The
+other common one is picking **Trusted entity type → AWS account → This account**
+when creating a role. This is the "a human (or another role) temporarily puts on
+a more-privileged hat" pattern — distinct from service roles.
+
+What it produces is a trust policy whose principal is the **account root**:
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": { "AWS": "arn:aws:iam::<account-id>:root" },
+  "Action": "sts:AssumeRole"
+}
+```
+
+> **`root` here does NOT mean "only the root user" or "everyone automatically."**
+> It means "the account is the trust boundary" — i.e. *IAM identities in this
+> account are eligible to assume me, provided they also hold `sts:AssumeRole`
+> permission for this role.* Both sides must still agree (trust policy says "this
+> account may," the user's identity policy says "I'm allowed to try"). Delegating
+> trust to the account root is what lets you manage who-can-assume with ordinary
+> IAM identity policies instead of editing the trust policy per user.
+
+### Using it from the console — Switch Role (and reading the result)
+
+A user clicks account name (top-right) → **Switch role** → enters account ID +
+role name → the console swaps their session for the role's temporary credentials.
+
+**What "it worked" actually looks like:** switch into a role that has *only*
+`AmazonS3ReadOnlyAccess` attached, then open the **Roles** page, and you'll get
+an access-denied like this (this is **success**, not a bug):
+
+```
+User:   arn:aws:sts::<account-id>:assumed-role/finance-manager/<original-user>
+Action: iam:ListRoles
+Context: no identity-based policy allows the action
+```
+
+Two things to read off this, both confirming the mechanics from the sections
+above:
+
+1. **The ARN is an `sts::...:assumed-role/...` ARN, not an `iam::...:user/...`
+   ARN.** That's the proof you're now running on **STS-issued temporary
+   credentials** tied to the role — not your long-term user. The trailing segment
+   (`<original-user>`) is the **role session name**, which is how CloudTrail
+   traces *which* identity assumed the role.
+2. **Everything outside the attached policy is denied.** The page calls
+   `iam:ListRoles` to render the list; the hat only grants S3 read-only, so it's
+   denied and the page shows "Roles (0)". That denial *is* least privilege
+   working — while wearing the role you can do S3-read and nothing else, with your
+   normal permissions set aside until you **Switch back**.
+
+> **Positive confirmation:** to see the role *permitting* rather than just
+> denying, go to **S3** while switched in — listing/reading buckets works, while a
+> write/delete is denied (it's read-*only*), and IAM stays denied. read ✅ /
+> write ❌ / everything-else ❌ is the cleanest one-screen demonstration of a
+> scoped role.
+
+### Using it from the CLI (the way you'll actually build)
+
+Console Switch Role is fine for a human clicking around; the CLI is how you use
+this in practice. The raw mechanism is `sts assume-role`:
+
+```bash
+aws sts assume-role \
+  --role-arn arn:aws:iam::<account-id>:role/finance-manager \
+  --role-session-name finance-session
+```
+
+This returns a JSON blob with **temporary** credentials under `Credentials`:
+
+```json
+{
+  "Credentials": {
+    "AccessKeyId": "ASIA...",          // note the ASIA prefix (temp), vs AKIA (long-term user key)
+    "SecretAccessKey": "...",
+    "SessionToken": "...",             // temp creds ONLY work with this token attached
+    "Expiration": "2026-10-19T12:34:56Z"
+  },
+  "AssumedRoleUser": {
+    "Arn": "arn:aws:sts::<account-id>:assumed-role/finance-manager/finance-session"
+  }
+}
+```
+
+Key details:
+
+- **`ASIA...` vs `AKIA...`** — temporary keys start with `ASIA`; long-term user
+  keys start with `AKIA`. Quick way to tell at a glance which kind you're holding.
+- **The `SessionToken` is mandatory.** Temporary credentials fail with an auth
+  error unless the session token travels with them — it's the third piece, not
+  optional.
+- **`--role-session-name`** is free-form but shows up in CloudTrail and in the
+  `assumed-role` ARN, so name it meaningfully (who/why).
+- **`Expiration`** — default session is 1 hour; extend with
+  `--duration-seconds` up to the role's **max session duration** (default max 1h,
+  raisable to 12h on the role).
+
+**Three ways to actually *use* the returned credentials:**
+
+**(a) Export them as env vars** — quick, manual, good for a one-off:
+
+```bash
+export AWS_ACCESS_KEY_ID=ASIA...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_SESSION_TOKEN=...        # don't forget this one
+aws s3 ls                           # now runs AS the role
+# ...when done, `unset` them or open a fresh shell to drop the hat
+```
+
+> This is exactly the "manually copying temp credentials out of the SDK" pattern
+> the expiry section below warns about — *this copy will genuinely expire* in ~1h
+> and start failing, because it's disconnected from auto-refresh. Fine for a short
+> manual task; **not** how long-running code should get credentials.
+
+**(b) Named profile in `~/.aws/config` — the clean, recommended way.** Let the
+CLI assume the role for you and auto-refresh; you never touch the raw keys:
+
+```ini
+# ~/.aws/config
+[profile finance]
+role_arn       = arn:aws:iam::<account-id>:role/finance-manager
+source_profile = default          # the long-term identity allowed to assume it
+# region       = us-east-1
+```
+
+```bash
+aws s3 ls --profile finance        # CLI assumes finance-manager under the hood
+export AWS_PROFILE=finance         # ...or set it for the whole shell session
+```
+
+The CLI calls `assume-role` for you, caches the temp creds, and refreshes them
+when they expire — no manual token juggling, no stale-credential failures.
+
+**(c) In code (SDK)** — don't call `assume-role` and paste keys around; configure
+the SDK's credential provider to assume the role (e.g. boto3's
+`profile_name="finance"`, or an `STSAssumeRoleProvider`). Same auto-refresh
+benefit as (b). Let the provider chain manage credentials live rather than caching
+them yourself.
+
+**The assumer still needs permission.** `source_profile`/your calling identity
+must have an identity policy allowing `sts:AssumeRole` on that role ARN, or you
+get `AccessDenied` on the assume call itself (the trust policy alone isn't
+enough — both sides agree, per the section above):
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "sts:AssumeRole",
+  "Resource": "arn:aws:iam::<account-id>:role/finance-manager"
+}
+```
+
+> **Which trust type to reach for:** human/CLI elevation into a job-function role
+> → **AWS account** trust + `sts:AssumeRole` (this section). A workload *inside*
+> AWS (EC2/Lambda) → **service** trust + attach/instance-profile (PhotoShare's
+> `iam_role_ec2`). Both issue the same kind of `assumed-role` temporary
+> credentials — only *who's trusted to assume* differs.
+
 ## What happens when a role's temporary credentials expire?
 
 If a role is just a temporary hat, does the app "crash" once the timer runs
