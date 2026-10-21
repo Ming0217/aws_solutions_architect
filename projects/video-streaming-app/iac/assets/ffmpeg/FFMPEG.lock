@@ -1,0 +1,13 @@
+# Pinned static FFmpeg build for the video-streaming-app worker.
+# Source: BtbN/FFmpeg-Builds GitHub releases (linux64-gpl, x86_64; libx264 + HLS).
+# Downloaded + SHA256-verified by scripts/fetch-ffmpeg.sh before `cdk synth`.
+#
+# NOTE: DESIGN.md names the daily tag autobuild-2024-11-01-14-16, but BtbN prunes
+# daily autobuilds and keeps only month-end snapshots for older dates, so that
+# tag no longer exists upstream. Re-pinned to the durable Nov-2024 month-end
+# snapshot (same FFmpeg n7.1 linux64-gpl build); SHA256 computed from the
+# downloaded asset. Re-pin to a newer month-end snapshot by updating all three
+# fields below and re-running the fetch script.
+TAG=autobuild-2024-11-30-13-12
+ASSET=ffmpeg-n7.1-39-g64e2864cb9-linux64-gpl-7.1.tar.xz
+SHA256=19a559d8ff2e919d9cf50318714f106bea4f4000fef85e3033899a34242e6266

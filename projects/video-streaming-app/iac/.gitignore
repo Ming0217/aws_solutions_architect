@@ -1,0 +1,6 @@
+cdk.out/
+cdk.context.json
+assets/ffmpeg/bin/
+.venv/
+__pycache__/
+frontend/config.json
