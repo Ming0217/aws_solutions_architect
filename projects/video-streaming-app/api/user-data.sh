@@ -6,7 +6,7 @@
 # same env var names the app reads locally:
 #   @@INPUT_BUCKET@@ @@OUTPUT_BUCKET@@ @@TABLE_NAME@@ @@ARTIFACT_BUCKET@@
 #   @@CF_KEY_SECRET_ARN@@ @@CF_DOMAIN@@ @@CF_KEY_PAIR_ID@@ @@PLAYBACK_MODE@@
-#   @@AWS_REGION@@
+#   @@AWS_REGION@@ @@MAX_UPLOAD_BYTES@@
 # CF_SIGNING_KEY_FILE is deliberately NOT written here: in AWS the private PEM
 # is read from Secrets Manager (CF_KEY_SECRET_ARN).
 set -euo pipefail
@@ -39,6 +39,7 @@ CF_DOMAIN=@@CF_DOMAIN@@
 CF_KEY_PAIR_ID=@@CF_KEY_PAIR_ID@@
 PLAYBACK_MODE=@@PLAYBACK_MODE@@
 AWS_REGION=@@AWS_REGION@@
+MAX_UPLOAD_BYTES=@@MAX_UPLOAD_BYTES@@
 EOF
 chmod 0640 /etc/video-web.env
 chown root:appuser /etc/video-web.env
