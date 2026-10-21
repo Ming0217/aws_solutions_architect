@@ -6,7 +6,7 @@ stack decomposition"):
 
 * ``VideoNetworkStack`` -- VPC, subnets, NAT, VPC endpoints, security groups.
 * ``VideoDataStack``    -- S3 buckets, DynamoDB, SQS + DLQ, signing-key secret.
-* ``VideoAppStack``     -- ALB/ASGs/CloudFront/Lambda (implemented in FEAT-005).
+* ``VideoAppStack``     -- ALB, ASGs, CloudFront, DLQ-marker Lambda, outputs.
 
 The account/region are pinned explicitly so synth stays credential-free: the
 in-stack VPC resolves deterministic subnet CIDRs and the buckets resolve their
@@ -14,6 +14,7 @@ fixed ``<account>-<region>`` names without any AWS context lookup.
 """
 import aws_cdk as cdk
 
+from stacks.app_stack import VideoAppStack
 from stacks.data_stack import VideoDataStack
 from stacks.network_stack import VideoNetworkStack
 
@@ -23,21 +24,12 @@ app = cdk.App()
 
 network = VideoNetworkStack(app, "VideoNetworkStack", env=ENV)
 data = VideoDataStack(app, "VideoDataStack", env=ENV)
-
-# VideoAppStack lands in FEAT-005. Guard the import so synth of the two
-# implemented stacks works today without leaving a NameError behind.
-try:
-    from stacks.app_stack import VideoAppStack
-except ImportError:
-    VideoAppStack = None
-
-if VideoAppStack is not None:
-    VideoAppStack(
-        app,
-        "VideoAppStack",
-        network=network,
-        data=data,
-        env=ENV,
-    )
+VideoAppStack(
+    app,
+    "VideoAppStack",
+    network=network,
+    data=data,
+    env=ENV,
+)
 
 app.synth()
