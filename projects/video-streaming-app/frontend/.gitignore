@@ -1,0 +1,3 @@
+# Runtime config: produced by BucketDeployment in AWS, or locally via
+# `cp config.local.json config.json`. Never committed.
+config.json

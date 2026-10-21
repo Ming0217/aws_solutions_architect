@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Video Streaming</title>
+    <link rel="stylesheet" href="styles.css" />
+    <!-- hls.js from CDN; no build step. app.js loads as an ES module. -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Video Streaming</h1>
+    </header>
+
+    <main>
+      <section id="upload-section">
+        <h2>Upload a video</h2>
+        <form id="upload-form">
+          <label>
+            Title (optional)
+            <input type="text" id="title-input" name="title" maxlength="200" />
+          </label>
+          <label>
+            File
+            <input type="file" id="file-input" name="file" accept="video/*" required />
+          </label>
+          <button type="submit" id="upload-button">Upload</button>
+        </form>
+        <p id="upload-status" class="muted" role="status"></p>
+      </section>
+
+      <section id="player-section" hidden>
+        <h2 id="player-title">Now playing</h2>
+        <video id="player" controls playsinline></video>
+        <p id="player-status" class="muted" role="status"></p>
+      </section>
+
+      <section id="gallery-section">
+        <h2>Your videos</h2>
+        <p id="gallery-empty" class="muted">No videos yet. Upload one above.</p>
+        <ul id="gallery"></ul>
+      </section>
+    </main>
+  </body>
+</html>
