@@ -1,0 +1,7 @@
+{
+  "task_id": "task-video-streaming-hardening",
+  "task_description": "Hardened (Phase 2) IaC build of the event-driven video-streaming platform from the APPROVED DESIGN.md: a CDK Python app (NetworkStack/DataStack/AppStack) with VPC+endpoints, two scoped IAM roles, four S3 buckets + lifecycle, SQS+DLQ, DynamoDB+GSI, EC2 worker ASG (queue-depth, scale-to-zero) + web ASG behind an internal ALB, CloudFront with signed-cookie HLS playback (private Output bucket), a DLQ-marker Lambda; a hardened FFmpeg EC2 worker; a FastAPI JSON API; a vanilla HTML/JS SPA; local-dev + DEPLOY runbooks. Deploy-ready and locally runnable only -- NO cdk deploy/destroy in this workflow.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006"],
+  "blocked_reason": null
+}
