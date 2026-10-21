@@ -9,7 +9,7 @@ services:
   - dynamodb
   - sqs
   - ec2
-status: built-and-tested-live
+status: v1-built-and-tested-live; hardened-iac-local-runnable-not-deployed
 tags:
   - aws
   - project
@@ -23,6 +23,26 @@ tags:
 > Part of the [H2 2026 AWS OKR](../README.md) — counts toward KR1 (documented
 > architecture), KR2 (working project — **project 3 of 3**), KR3
 > (Well-Architected), and KR4 (walkthrough).
+
+> **Hardened build (Phase 2) — status.** The tutorial v1 below was **console-built
+> and verified live**; those console resources have since been shut down. The
+> hardened rebuild is **AWS CDK (Python)** — three stacks that synthesize — with
+> the FastAPI web tier + vanilla SPA **runnable locally** against env-injected
+> resource names (see [`video-streaming-app/LOCAL_DEV.md`](./video-streaming-app/LOCAL_DEV.md)).
+> **No `cdk deploy` or `cdk destroy` was run in this workflow — nothing was
+> provisioned in AWS this pass.** How each hardening flag is closed by the
+> as-built code is in [the architecture walkthrough](./video-streaming-app/walkthrough.md)
+> and [`video-streaming-app/DESIGN.md`](./video-streaming-app/DESIGN.md).
+>
+> **Confirmed branch-point decisions:** IaC = **CDK in Python**; transcode compute
+> stays faithful (hardened EC2/FFmpeg worker); frontend = **vanilla HTML/JS static
+> SPA** verified locally first; **no auth** this pass. Playback uses **CloudFront
+> signed COOKIES in production** (confirmed) — scoping `/media/{video_id}/*` with
+> one signing op for the whole HLS fan-out — and signed URLs in local dev (a
+> browser on `127.0.0.1` can't carry a CloudFront-domain cookie). This meets the
+> "CloudFront + signed URLs" spec substance (private Output bucket, CloudFront-gated
+> playback, per-video-scoped credentials); only the production delivery vehicle
+> differs. See the walkthrough §5 for the full rationale.
 
 ## Use case / goal
 
@@ -420,7 +440,14 @@ Web-Server + Worker-Server (Amazon Linux 2023, t3.micro). _Role:_ `iam_role_vide
 
 ## Cleanup
 
-- [ ] Tore down resources to avoid charges
+- [x] **Tutorial v1 (console) resources shut down** — the console-built build was
+  torn down earlier; nothing from v1 is still running.
+- [n/a] **Hardened Phase 2** — not deployed in this workflow, so there is nothing
+  to tear down. The CDK stacks set `removalPolicy=DESTROY` (+ `autoDeleteObjects`
+  on buckets) and the worker ASG scales to zero, so a single `cdk destroy` in
+  reverse stack order removes everything **if/when** an operator deploys it (the
+  `cdk deploy`/`cdk destroy` runbook is in
+  [`video-streaming-app/iac/README.md`](./video-streaming-app/iac/README.md)).
 
 ## Walkthrough summary
 
