@@ -287,12 +287,15 @@ class VideoAppStack(Stack):
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
                 ),
             },
-            # SPA: serve index.html for client-routed 403/404s.
+            # SPA deep-link fallback: serve index.html for 404s only. We do NOT
+            # map 403 -> index.html: CloudFront custom error responses are
+            # distribution-wide, so a 403->index.html rule would also rewrite
+            # the 403 the /media/* trusted-key-group returns on a missing or
+            # expired signed cookie, turning it into a 200 serving index.html.
+            # hls.js would then never see the 403 and player.js's cookie-refresh
+            # path (onRefresh) would never fire. Keeping only 404->index.html
+            # lets genuine /media/* 403s reach the player.
             error_responses=[
-                cloudfront.ErrorResponse(
-                    http_status=403, response_http_status=200,
-                    response_page_path="/index.html",
-                ),
                 cloudfront.ErrorResponse(
                     http_status=404, response_http_status=200,
                     response_page_path="/index.html",
