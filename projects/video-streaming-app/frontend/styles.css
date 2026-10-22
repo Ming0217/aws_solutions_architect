@@ -1,18 +1,25 @@
+/* The HTML `hidden` attribute must always win over component display rules
+   (e.g. .modal/.player-modal set display:flex); otherwise hidden modals and
+   toggled states render on load. */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   /* Color tokens */
-  --bg: #0a0c10;
-  --bg-elevated: #10141b;
-  --panel: #141a22;
-  --panel-2: #19212b;
-  --text: #f3f5f8;
-  --muted: #9aa6b6;
-  --faint: #67748a;
-  --accent: #4f8cff;
-  --accent-strong: #3b74e8;
+  --bg: #080808;
+  --bg-elevated: #141414;
+  --panel: #141414;
+  --panel-2: #1b1b1b;
+  --text: #ffffff;
+  --muted: #b3b3b3;
+  --faint: #8c8c8c;
+  --accent: #e50914;
+  --accent-strong: #f6121d;
   --accent-contrast: #ffffff;
-  --border: #212a36;
-  --border-strong: #2d3845;
-  --ring: rgba(79, 140, 255, 0.5);
+  --border: #2a2a2a;
+  --border-strong: #3a3a3a;
+  --ring: rgba(229, 9, 20, 0.5);
 
   /* Status colors */
   --status-queued: #a5b4cf;
@@ -213,7 +220,7 @@ a {
 
 .btn-secondary:hover:not(:disabled) {
   border-color: var(--accent);
-  background: rgba(79, 140, 255, 0.08);
+  background: rgba(229, 9, 20, 0.08);
 }
 
 .btn-sm {
@@ -248,7 +255,7 @@ a {
 .btn-icon:hover {
   color: var(--text);
   border-color: var(--accent);
-  background: rgba(79, 140, 255, 0.08);
+  background: rgba(229, 9, 20, 0.08);
 }
 
 .btn-icon:focus-visible {
@@ -284,9 +291,9 @@ a {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 140% at 80% 10%, rgba(79, 140, 255, 0.35), transparent 55%),
-    radial-gradient(120% 140% at 10% 90%, rgba(52, 211, 153, 0.18), transparent 55%),
-    linear-gradient(135deg, #1b2636, #0d1219);
+    radial-gradient(120% 140% at 80% 10%, rgba(229, 9, 20, 0.35), transparent 55%),
+    radial-gradient(120% 140% at 10% 90%, rgba(229, 9, 20, 0.10), transparent 55%),
+    linear-gradient(135deg, #1a1012, #0a0a0a);
 }
 
 .hero-overlay {
@@ -373,8 +380,8 @@ a {
   border-radius: var(--radius);
   overflow: hidden;
   background:
-    radial-gradient(120% 120% at 50% 0%, rgba(79, 140, 255, 0.18), transparent 60%),
-    linear-gradient(135deg, #1c2634, #111822);
+    radial-gradient(120% 120% at 50% 0%, rgba(229, 9, 20, 0.18), transparent 60%),
+    linear-gradient(135deg, #1a1414, #0f0f0f);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -675,12 +682,12 @@ a {
 
 .dropzone:hover {
   border-color: var(--accent);
-  background: rgba(79, 140, 255, 0.06);
+  background: rgba(229, 9, 20, 0.06);
 }
 
 .dropzone.is-dragover {
   border-color: var(--accent);
-  background: rgba(79, 140, 255, 0.12);
+  background: rgba(229, 9, 20, 0.12);
   transform: translateY(-1px);
 }
 
@@ -714,7 +721,7 @@ a {
   max-width: 100%;
   padding: 0.3rem 0.7rem;
   border-radius: 999px;
-  background: rgba(79, 140, 255, 0.14);
+  background: rgba(229, 9, 20, 0.14);
   color: var(--text);
   font-size: 0.82rem;
   overflow: hidden;
