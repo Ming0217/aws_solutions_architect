@@ -48,9 +48,10 @@ against a **private** Output bucket. No auth this pass — public, like the
 tutorial (no Cognito).
 
 The technology stack is locked once this design is approved: Python 3.12, CDK v2
-pinned to **`aws-cdk-lib ^2.170.0`** (matches the clear-thinking-app reference
-app and is ≥ 2.166, the first release carrying the `cloudfront.VpcOrigin` L2
-construct this design relies on), FastAPI + `uvicorn`/`gunicorn` + `boto3` for the
+pinned to **`aws-cdk-lib >=2.170.0`** (matches the clear-thinking-app reference
+app; the `aws_apigatewayv2`/`aws_apigatewayv2_integrations` L2 constructs the
+`/api` hop relies on — `HttpApi`, `VpcLink`, `HttpAlbIntegration` — are stable in
+this range), FastAPI + `uvicorn`/`gunicorn` + `boto3` for the
 web tier, a Python `worker.py` long-poll loop + static FFmpeg for the worker,
 Amazon Linux 2023 AMIs, and vanilla ES-module JS (`hls.js` for playback) for the
 SPA.
@@ -103,12 +104,14 @@ A single VPC (`10.0.0.0/16`) across two AZs:
 
 - **Public subnets** (one per AZ) host only the **NAT gateway**. There is no
   internet-facing load balancer: the **ALB is internal** (no public IP, placed in
-  the private subnets) and is reached only through a **CloudFront VPC origin**
-  (below), so the single public surface is the CloudFront distribution itself.
+  the private subnets) and is reached only through an **API Gateway HTTP API +
+  VPC Link** (below), so the single public surface is the CloudFront distribution
+  itself.
 - **Private subnets** (`PRIVATE_WITH_EGRESS`, one per AZ) host the **internal
-  ALB**, the web ASG instances, and the worker ASG instances. Nothing here gets a
-  public IP. The web tier is reachable only through the ALB (itself reachable only
-  from CloudFront's VPC-origin ENIs); the worker is reachable by nothing inbound.
+  ALB**, the web ASG instances, the worker ASG instances, and the **API Gateway
+  VPC Link ENIs**. Nothing here gets a public IP. The web tier is reachable only
+  through the ALB (itself reachable only from the VPC Link's ENIs); the worker is
+  reachable by nothing inbound.
 - **NAT gateway** (single, in one public subnet — cost choice for a lab; the
   doc's scale-to-zero worker means NAT is mostly idle) gives private instances
   outbound for OS/package updates and SSM.
@@ -127,50 +130,58 @@ inbound SSH (port 22) — this directly closes the "SSH `0.0.0.0/0`" flag and th
 "worker needs no inbound at all" flag. The SSM interface endpoints let the agent
 reach Systems Manager over the private network; operators use
 `aws ssm start-session`. (Per the builder-security policy: datastores and compute
-are private by default; the only public ingress is the ALB on 443/80.)
+are private by default; the only public ingress is the CloudFront distribution on
+443. The ALB is internal and reached only through the API Gateway VPC Link.)
 
 **Security groups** (private-by-default, least ingress):
 
-- `alb-sg` (internal ALB): inbound **TCP 80 only, from the VPC's private-subnet
-  CIDRs** (the `/24`s carved for `PRIVATE_WITH_EGRESS` — a strict subset of the
-  VPC `10.0.0.0/16`) — not `0.0.0.0/0`, and not the public CloudFront
-  origin-facing prefix list, because with a **VPC origin** CloudFront reaches the
-  ALB over AWS's private network through managed ENIs placed **in those private
-  subnets**, never over the public internet. CloudFront's VPC-origin ENIs
-  therefore source from private IPs inside those CIDRs, and nothing else can
-  reach the internal ALB (it has no public IP and no public-subnet exposure), so
-  a private-CIDR ingress is as tight as the path allows. This is the Finding-6
-  fix: the CloudFront-edge→ALB hop (which carries the signed-cookie `Set-Cookie`
-  header and uploaded video bytes) stays inside the AWS network instead of
-  traversing the public internet as plaintext HTTP. It also removes the need for
-  an ACM cert on the ALB's unresolvable `*.elb.amazonaws.com` name (TLS is
-  terminated at CloudFront with its default `*.cloudfront.net` cert) and
-  eliminates the HTTPS-SPA-calling-HTTP-ALB mixed-content break. Egress to
-  `web-sg` on the app port only.
-  - **Why a private-CIDR rule and not "the SG the VPC origin creates"
-    (Finding 1).** The pinned `aws-cdk-lib ^2.170.0` `cloudfront.VpcOrigin` L2
-    construct provisions the origin against the ALB but does **not** surface a
-    referenceable security-group object for its CloudFront-managed ENIs that you
-    could pass to `alb_sg.add_ingress_rule(peer=...)`, and it does not accept a
-    caller-supplied SG for them. So the implementable, verifiable ingress source
-    is the private-subnet CIDR set, resolved at synth from
-    `vpc.select_subnets(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)`:
-    ```python
-    for subnet in vpc.select_subnets(
-            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS).subnets:
-        alb_sg.add_ingress_rule(
-            peer=ec2.Peer.ipv4(subnet.ipv4_cidr_block),
-            connection=ec2.Port.tcp(80),
-            description="CloudFront VPC-origin ENIs (private subnets)")
-    ```
-    If a later pinned `aws-cdk-lib` exposes the VPC-origin SG as a referenceable
-    object, prefer referencing it directly (narrower still); until then the
-    private-CIDR rule is the concrete contract, not "whatever SG CDK creates."
-  - *Alternative considered:* an internet-facing ALB with an ACM cert and an
-    HTTPS origin (so the hop is TLS end-to-end). Rejected because it requires a
-    custom domain + ACM cert for the ALB (the `*.elb.amazonaws.com` name can't
-    hold a public cert), which is more moving parts than a lab needs; the VPC
-    origin keeps the hop private with zero cert management.
+- `alb-sg` (internal ALB): inbound **TCP 80 only, from the API Gateway VPC Link's
+  security group** (`vpclink-sg`) — not `0.0.0.0/0`, and not a private-subnet
+  CIDR range. The `/api` hop is CloudFront → an **API Gateway HTTP API** (over
+  HTTPS) → a **VPC Link** → this internal ALB (see **CloudFront + signed-cookie
+  playback** and the Finding-3 remediation note below). The VPC Link places its
+  ENIs in the private subnets carrying `vpclink-sg`, so referencing that SG is an
+  exact, synth-resolvable ingress source — nothing else can reach the internal
+  ALB (it has no public IP and no public-subnet exposure). This is the Finding-3
+  remediation: the CloudFront→origin hop now terminates on the API Gateway
+  endpoint's AWS-managed TLS cert (so the signed-cookie `Set-Cookie` and uploaded
+  bytes are encrypted over the internet), and the API-Gateway→ALB hop stays on
+  AWS's private network via the VPC Link. No ACM cert is needed on the ALB's
+  unresolvable `*.elb.amazonaws.com` name. Egress to `web-sg` on the app port
+  only.
+  ```python
+  # network_stack.py
+  alb_sg.add_ingress_rule(
+      peer=vpclink_sg,
+      connection=ec2.Port.tcp(80),
+      description="From API Gateway VPC Link only")
+  vpclink_sg.add_egress_rule(
+      peer=alb_sg,
+      connection=ec2.Port.tcp(80),
+      description="To internal ALB (HTTP listener)")
+  ```
+  - **Why API Gateway + VPC Link and not a CloudFront VPC origin (Finding 3).**
+    An earlier revision used a `cloudfront.VpcOrigin` straight to the internal
+    ALB. In a live deploy that path returned a 30 s CloudFront 504 on every
+    `/api/*` request despite a textbook-correct SG/port/target-health/NACL
+    configuration (see `walkthrough.md` §9a). The API Gateway HTTP API + VPC Link
+    is the well-trodden replacement: the HTTP API's default
+    `https://{id}.execute-api.{region}.amazonaws.com` endpoint carries a valid
+    AWS-managed cert (so CloudFront uses it as an HTTPS custom origin with
+    `protocol_policy=HTTPS_ONLY`, no custom domain), and the VPC Link reaches the
+    still-internal ALB privately. The `/api` prefix is stripped at the HTTP API
+    (route `ANY /api/{proxy+}`, integration parameter mapping
+    `overwrite:path = /${request.path.proxy}`) so the FastAPI app keeps its
+    existing unprefixed routes (`/videos`, `/health`, …) and local dev — which
+    calls those routes unprefixed — is unaffected.
+  - *Alternative considered:* an internet-facing ALB restricted to the
+    `com.amazonaws.global.cloudfront.origin-facing` managed prefix list with an
+    ACM cert. Rejected because it makes the ALB internet-facing (loses the
+    hardening) and needs a custom domain + cert; the API Gateway path keeps the
+    ALB private with zero cert management and stays on the single CloudFront
+    domain (no CORS / cross-domain-cookie issues).
+- `vpclink-sg` (API Gateway VPC Link ENIs): no inbound; egress **TCP 80 to
+  `alb-sg`** only. The VPC Link is created in the private subnets with this SG.
 - `web-sg`: inbound only from `alb-sg` on the gunicorn port (**8000**). No other
   inbound. Egress: HTTPS to the VPC endpoints + NAT.
 - `worker-sg`: **no inbound rules at all**. Egress: HTTPS to endpoints + NAT.
@@ -480,15 +491,18 @@ problem and the cross-domain-cookie problem at once:
 | Path pattern | Origin | Behavior |
 | --- | --- | --- |
 | `/media/*` | Output bucket via **OAC** | **requires signed cookies** (trusted key group); redirect-to-HTTPS |
-| `/api/*` | the **internal ALB via a CloudFront VPC origin** (private hop over AWS's network, not the public internet) | no CloudFront caching (`CachePolicy.CACHING_DISABLED`), forward all headers/cookies; this is where the API lives |
+| `/api/*` | an **API Gateway HTTP API over HTTPS** (`HttpOrigin`, `protocol_policy=HTTPS_ONLY`), which forwards via a **VPC Link** to the **internal ALB** | no CloudFront caching (`CachePolicy.CACHING_DISABLED`), `ALL_VIEWER_EXCEPT_HOST_HEADER` origin-request policy (an API Gateway custom origin needs its own `execute-api` Host); this is where the API lives |
 | default (`/*`) | Frontend (site) bucket via **OAC** | the SPA static assets; no signing |
 
 Because the SPA, the API, and the media all share the **one CloudFront domain**,
 a `Set-Cookie` returned by the API response (proxied through CloudFront from the
-ALB) is scoped to that same host, so the browser **does** attach the CloudFront
-signed cookies to the subsequent `/media/*` segment requests. (This is the
-specific thing that failed when the API was on the raw ALB domain and media on a
-separate CloudFront domain.)
+API Gateway → VPC Link → ALB path) is scoped to that same host, so the browser
+**does** attach the CloudFront signed cookies to the subsequent `/media/*`
+segment requests. (This is the specific thing that failed when the API was on the
+raw ALB domain and media on a separate CloudFront domain.) The whole
+CloudFront→origin hop is HTTPS: CloudFront terminates on the API Gateway
+endpoint's AWS-managed cert, so the `Set-Cookie` never crosses the internet in
+plaintext.
 
 - The **Output bucket stays private** — S3 **Block Public Access ON** (all four
   settings), no bucket ACLs, no public policy. CloudFront reaches it through an
@@ -981,3 +995,34 @@ backlogged, none ignored.
 8. **NIT — broken reference link `clear-thinking-app/iac`.** Addressed. The
    wikilink now points at **`[[projects/clear-thinking-app]]`** (the note),
    naming its `iac/` CDK app in prose. (See **Overview** header.)
+
+## Post-deploy remediation — Finding 3 (CloudFront → internal ALB)
+
+The round-2/round-3 design used a **CloudFront VPC origin** straight to the
+internal ALB for `/api/*`. The live deploy (see `walkthrough.md` §9a) proved that
+path does **not** carry edge→ALB traffic — every `/api/*` request returned a 30 s
+CloudFront 504 despite a textbook-correct SG / port / target-health / NACL
+configuration. The VPC-origin feature was the single thing that didn't work.
+
+**Remediation (applied in code, synth-verified).** The `/api` hop is now a
+well-trodden pattern: CloudFront `/api/*` → an **API Gateway HTTP API** (its
+AWS-managed `execute-api` HTTPS endpoint, used as an `HttpOrigin` with
+`protocol_policy=HTTPS_ONLY`) → a **VPC Link** (ENIs in the private subnets,
+`vpclink-sg`) → the **still-internal ALB** → the web ASG (FastAPI on `:8000`).
+
+- The ALB stays `internet_facing=False` in the private subnets (hardening
+  preserved); its SG admits TCP 80 from `vpclink-sg` only — never `0.0.0.0/0`,
+  never a private-CIDR range.
+- The CloudFront→origin hop is HTTPS end-to-end (the `execute-api` cert), so the
+  signed-cookie `Set-Cookie` is never plaintext over the internet.
+- Everything stays on the single CloudFront domain (no CORS / cross-domain-cookie
+  issues), and the obsolete `cloudfront.VpcOrigin` construct is removed.
+- The `/api` prefix is stripped at the HTTP API (route `ANY /api/{proxy+}`,
+  integration `overwrite:path = /${request.path.proxy}`), so the FastAPI app is
+  **unchanged** and keeps its unprefixed routes; local dev (which calls those
+  routes unprefixed) keeps working.
+
+This supersedes round-2 response 6 and round-3 response 1 (both of which described
+the now-removed VPC-origin + private-CIDR-ingress approach). Live end-to-end
+re-validation (upload → `Ready` → signed-cookie playback) remains a future
+one-command redeploy.

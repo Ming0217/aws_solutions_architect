@@ -82,7 +82,7 @@ class VideoNetworkStack(Stack):
             self,
             "AlbSg",
             vpc=self.vpc,
-            description="Internal ALB: inbound 80 from private-subnet CIDRs only",
+            description="Internal ALB: inbound 80 from the API Gateway VPC Link only",
             allow_all_outbound=False,
         )
         self.web_sg = ec2.SecurityGroup(
@@ -99,20 +99,34 @@ class VideoNetworkStack(Stack):
             description="Worker: no inbound",
             allow_all_outbound=True,
         )
+        # The API Gateway HTTP API reaches the internal ALB through a VPC Link
+        # whose ENIs live in the private subnets carrying this SG. It is the
+        # only peer allowed into the ALB (the ALB stays internal, no public IP).
+        self.vpclink_sg = ec2.SecurityGroup(
+            self,
+            "VpcLinkSg",
+            vpc=self.vpc,
+            description="API Gateway HTTP API VPC Link ENIs (private subnets)",
+            allow_all_outbound=False,
+        )
 
-        # alb-sg inbound TCP 80 from each PRIVATE_WITH_EGRESS subnet CIDR (where
-        # CloudFront places its VPC-origin ENIs) -- NOT 0.0.0.0/0. The L2
-        # VpcOrigin does not surface a referenceable SG for those ENIs, so the
-        # private-subnet CIDR set is the concrete, synth-resolvable ingress
-        # source. See DESIGN.md "security groups -> alb-sg".
-        for subnet in self.vpc.select_subnets(
-            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-        ).subnets:
-            self.alb_sg.add_ingress_rule(
-                peer=ec2.Peer.ipv4(subnet.ipv4_cidr_block),
-                connection=ec2.Port.tcp(80),
-                description="CloudFront VPC-origin ENIs (private subnets)",
-            )
+        # alb-sg inbound TCP 80 from the VPC Link SG only -- NOT 0.0.0.0/0 and
+        # not a private-CIDR range. The HTTP API VPC Link is the sole path from
+        # CloudFront's /api/* behaviour (CloudFront -> API Gateway over HTTPS ->
+        # VPC Link -> internal ALB), so its SG is the exact, referenceable
+        # ingress source. See DESIGN.md "security groups -> alb-sg".
+        self.alb_sg.add_ingress_rule(
+            peer=self.vpclink_sg,
+            connection=ec2.Port.tcp(80),
+            description="From API Gateway VPC Link only",
+        )
+
+        # VPC Link egress to the internal ALB on the listener port only.
+        self.vpclink_sg.add_egress_rule(
+            peer=self.alb_sg,
+            connection=ec2.Port.tcp(80),
+            description="To internal ALB (HTTP listener)",
+        )
 
         # alb-sg egress to the web tier on the app port only.
         self.alb_sg.add_egress_rule(

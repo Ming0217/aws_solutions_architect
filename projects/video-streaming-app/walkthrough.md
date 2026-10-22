@@ -54,7 +54,7 @@ Output bucket. This mirrors the v1→Phase-2 arc of
 | --- | --- | --- |
 | IaC | **AWS CDK (Python)**, 3 stacks | One language infra+app; one-command teardown; split along lifecycle/teardown boundaries (`DESIGN.md` "CDK stack decomposition") |
 | Network | VPC, public + private subnets across 2 AZs, single NAT | Public subnets hold only the NAT; ALB, web ASG, worker ASG are all private |
-| Public surface | **One CloudFront distribution**, three origins | Single HTTPS domain for SPA (`/*`), API (`/api/*` → internal ALB VPC origin), media (`/media/*` → Output bucket OAC) |
+| Public surface | **One CloudFront distribution**, three origins | Single HTTPS domain for SPA (`/*`), API (`/api/*` → API Gateway HTTP API over HTTPS → VPC Link → internal ALB), media (`/media/*` → Output bucket OAC) |
 | Web tier | EC2 ASG running **FastAPI** (gunicorn/uvicorn), unprivileged, port 8000 | Self-built contract; no root, no Flask dev server; behind the internal ALB |
 | Worker | EC2 ASG, **c7i.large**, FFmpeg, private subnet, min0/max4/desired0 | Compute-optimized for real transcode; scale-to-zero on queue depth; no inbound |
 | Ingest buffer | **SQS** + **DLQ** (`maxReceiveCount=3`, 900s visibility) | Decouples upload from transcode; quarantines poison pills; timeout exceeds worst-case transcode |
@@ -155,11 +155,14 @@ no rewrite.
 - **Single NAT gateway** (one, not one-per-AZ). *Tradeoff:* the private tier's
   *outbound* egress is a single-AZ risk; acceptable for a lab whose scale-to-zero
   worker leaves NAT mostly idle, and gateway endpoints keep S3/DynamoDB off NAT.
-- **Internal ALB + CloudFront VPC origin over an internet-facing ALB + ACM.**
-  Keeps the CloudFront→ALB hop on AWS's private network with zero cert
-  management. *Tradeoff:* `alb-sg` ingress is the private-subnet CIDR set rather
-  than a referenceable VPC-origin SG (the pinned `aws-cdk-lib` L2 doesn't surface
-  one) — the concrete contract until a later version exposes it.
+- **Internal ALB fronted by an API Gateway HTTP API + VPC Link, over an
+  internet-facing ALB + ACM or a CloudFront VPC origin.** Keeps the ALB private
+  (hardening preserved), encrypts the CloudFront→origin hop on the `execute-api`
+  cert, and stays on the single CloudFront domain. This replaced a CloudFront VPC
+  origin that did not pass edge→ALB traffic in the live deploy (§9a, Finding 3).
+  *Tradeoff:* one extra managed hop (API Gateway) and its `/api`-prefix path
+  mapping, versus a direct origin — accepted because the VPC origin didn't work
+  and the internet-facing-ALB alternative loses the private-ALB hardening.
 - **Fixed-name resources** (buckets with an account+region suffix, `VideoCatalog`,
   `VideoQueue`, the worker ASG name). *Tradeoff:* less CDK auto-naming, but the
   IAM policies stay literal ARNs and user-data can embed the ASG name with no
@@ -255,17 +258,37 @@ and the subnet NACLs are default allow-all. So a textbook-correct configuration
 of the **newer CloudFront VPC-origin feature** still would not carry traffic from
 the edge to the private ALB. A secondary `/api`-prefix mismatch waits behind it
 (CloudFront forwards `/api/videos` but the app serves `/videos`).
-*Remediation (not yet applied): replace the VPC-origin hop with a better-trodden
-path — an internet-facing ALB restricted to the `com.amazonaws.global.cloudfront.origin-facing`
-managed prefix list, or front `/api` with API Gateway — and strip/align the `/api`
-prefix. Fixable in code + `synth`-verifiable offline; re-proving it live is a
-future one-command redeploy.*
+**Remediation — APPLIED IN CODE, `synth`-verified (not yet live-redeployed).**
+The VPC-origin hop is removed and replaced with a well-trodden path: CloudFront
+`/api/*` → an **API Gateway HTTP API** (its AWS-managed `execute-api` HTTPS
+endpoint, used as an `HttpOrigin` with `protocol_policy=HTTPS_ONLY`) → a **VPC
+Link** (ENIs in the private subnets, `vpclink-sg`) → the **still-internal ALB** →
+the web ASG (FastAPI on `:8000`). The secondary `/api`-prefix mismatch is fixed in
+the same hop: the HTTP API route is `ANY /api/{proxy+}` with an integration
+parameter mapping `overwrite:path = /${request.path.proxy}`, so the ALB (and the
+app) receive `/videos`, `/health`, … unprefixed — the FastAPI app is unchanged
+and local dev keeps working. Verified by `cdk synth` + `ruff` + `pytest`:
 
-**Not re-validated end-to-end:** because of Finding 3, the browser upload →
-`Queued` → worker → `Ready` → signed-cookie playback run (and the DLQ/`Failed`
-failure test) were not completed live; they remain pending the Finding-3 fix +
-a redeploy. Teardown was verified (no lingering stacks/buckets/table/queues/
-secret/log groups/distribution/ASGs).
+- the `VideoAppStack` template has an `AWS::ApiGatewayV2::Api` (`video-api`,
+  HTTP), an `AWS::ApiGatewayV2::VpcLink`, and a `VPC_LINK` integration to the ALB
+  HTTP listener with `overwrite:path = /${request.path.proxy}`;
+- the ALB is still `Scheme: internal` (no public IP) and its SG admits TCP 80
+  from `vpclink-sg` only — no `0.0.0.0/0`;
+- the CloudFront `/api/*` behaviour points at the `execute-api` origin with
+  `OriginProtocolPolicy: https-only` and the `AllViewerExceptHostHeader`
+  origin-request policy (so API Gateway sees its own Host); and
+- the `AWS::CloudFront::VpcOrigin` resource is gone.
+
+This keeps the ALB private (hardening preserved), encrypts the CloudFront→origin
+hop carrying the signed-cookie `Set-Cookie`, and stays on the single CloudFront
+domain (no CORS/cross-domain-cookie issues). Re-proving it live is a future
+one-command redeploy.
+
+**Not re-validated end-to-end:** the browser upload → `Queued` → worker →
+`Ready` → signed-cookie playback run (and the DLQ/`Failed` failure test) were not
+completed live — they ran into Finding 3 during the deploy and remain pending a
+redeploy on the remediated code. Teardown was verified (no lingering
+stacks/buckets/table/queues/secret/log groups/distribution/ASGs).
 
 ## 10. Takeaways
 

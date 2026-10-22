@@ -9,9 +9,15 @@ and "Clean teardown + outputs".
 Carries the FEAT-005 MUST-FIX items: the ``CfPublicKeyId`` output and the
 ``CF_KEY_PAIR_ID`` web-env injection (the signer needs the PUBLIC KEY id, not
 the key-group id); a ResponseHeadersPolicy CORS on ``/media/*`` plus S3 CORS on
-the Output bucket so local HLS segment fetches succeed; the verified
-CloudFront VPC-origin -> internal-ALB wiring (private-subnet-CIDR ingress, see
-VideoNetworkStack); and gp3 block devices on both launch templates.
+the Output bucket so local HLS segment fetches succeed; and gp3 block devices on
+both launch templates.
+
+Finding-3 remediation: the ``/api/*`` hop no longer uses a CloudFront VPC origin
+to the internal ALB (which would not pass edge->ALB traffic live). Instead
+CloudFront's ``/api/*`` behaviour targets an **API Gateway HTTP API** over HTTPS
+(its AWS-managed ``execute-api`` endpoint), which forwards through a **VPC Link**
+to the still-internal ALB. The HTTP API strips the ``/api`` prefix via a path
+parameter mapping so the FastAPI app keeps its unprefixed routes.
 """
 from pathlib import Path
 
@@ -21,6 +27,8 @@ from aws_cdk import (
     RemovalPolicy,
     Stack,
 )
+from aws_cdk import aws_apigatewayv2 as apigwv2
+from aws_cdk import aws_apigatewayv2_integrations as apigw_integrations
 from aws_cdk import aws_autoscaling as autoscaling
 from aws_cdk import aws_cloudfront as cloudfront
 from aws_cdk import aws_cloudfront_origins as origins
@@ -192,13 +200,58 @@ class VideoAppStack(Stack):
             "HttpListener",
             port=80,
             protocol=elbv2.ApplicationProtocol.HTTP,
-            open=False,  # alb-sg ingress is the private-CIDR rule, not 0.0.0.0/0
+            open=False,  # alb-sg ingress is the VPC-Link SG rule, not 0.0.0.0/0
+        )
+
+        # ---- API Gateway HTTP API -> VPC Link -> internal ALB --------------
+        # Finding-3 remediation. CloudFront's /api/* behaviour targets this
+        # HTTP API's AWS-managed https endpoint (below); the HTTP API forwards
+        # through a VPC Link (ENIs in the private subnets, vpclink-sg) to the
+        # still-internal ALB. The ALB keeps no public IP and never becomes
+        # internet-facing. The route strips the /api prefix via a path
+        # parameter mapping so the FastAPI app keeps its unprefixed routes
+        # (/videos, /health, ...): CloudFront forwards /api/videos ->
+        # HTTP API route ANY /api/{proxy+} -> overwrite:path=/${proxy} ->
+        # the ALB receives /videos.
+        vpc_link = apigwv2.VpcLink(
+            self, "ApiVpcLink",
+            vpc=vpc,
+            subnets=private_subnets,
+            security_groups=[network.vpclink_sg],
+            vpc_link_name="video-api-vpclink",
+        )
+        api_alb_integration = apigw_integrations.HttpAlbIntegration(
+            "ApiAlbIntegration",
+            listener,
+            vpc_link=vpc_link,
+            method=apigwv2.HttpMethod.ANY,
+            parameter_mapping=apigwv2.ParameterMapping().overwrite_path(
+                apigwv2.MappingValue.custom("/${request.path.proxy}")
+            ),
+        )
+        http_api = apigwv2.HttpApi(
+            self, "ApiHttpApi",
+            api_name="video-api",
+            # CloudFront is the public surface; the execute-api endpoint is an
+            # internal origin reached only from CloudFront over HTTPS.
+            create_default_stage=True,
+        )
+        http_api.add_routes(
+            path="/api/{proxy+}",
+            methods=[apigwv2.HttpMethod.ANY],
+            integration=api_alb_integration,
+        )
+        # The HTTP API default ($default) stage serves at the root of the
+        # AWS-managed endpoint, which carries a valid AWS TLS cert -- so
+        # CloudFront can use it as an HTTPS custom origin with no custom domain.
+        api_origin_domain = (
+            f"{http_api.http_api_id}.execute-api.{region}.amazonaws.com"
         )
 
         # The web ASG is built AFTER the distribution: its user-data embeds the
         # CloudFront domain + public-key id, which are tokens from the
-        # distribution (itself built on top of the ALB's VPC origin). The ALB
-        # does not depend on the web launch template, so this stays acyclic.
+        # distribution. The ALB does not depend on the web launch template, so
+        # this stays acyclic.
 
         # ---- CloudFront public key + key group (signed cookies) ------------
         public_key = cloudfront.PublicKey(
@@ -259,10 +312,14 @@ class VideoAppStack(Stack):
         media_origin = origins.S3BucketOrigin.with_origin_access_control(
             output_bucket_ref
         )
-        api_origin = origins.VpcOrigin.with_application_load_balancer(
-            alb,
-            http_port=80,
-            protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+        # /api/* origin: the API Gateway HTTP API over HTTPS. HTTPS_ONLY keeps
+        # the CloudFront->origin hop (which carries the signed-cookie
+        # Set-Cookie) encrypted; the execute-api endpoint's AWS-managed cert
+        # terminates it. The HTTP API then reaches the internal ALB privately
+        # via the VPC Link.
+        api_origin = origins.HttpOrigin(
+            api_origin_domain,
+            protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
         )
 
         distribution = cloudfront.Distribution(
@@ -289,7 +346,11 @@ class VideoAppStack(Stack):
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
-                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
+                    # Forward everything EXCEPT the Host header: an API Gateway
+                    # custom origin needs the Host to be its own execute-api
+                    # domain (SNI + host-based routing), so the viewer Host (the
+                    # CloudFront domain) must not override it.
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
                 ),
             },
             # SPA deep-link fallback: serve index.html for 404s only. We do NOT

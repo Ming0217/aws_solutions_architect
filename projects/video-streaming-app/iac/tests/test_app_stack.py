@@ -103,9 +103,79 @@ def test_both_launch_templates_use_gp3():
         assert mappings[0]["Ebs"]["VolumeType"] == "gp3"
 
 
-def test_vpc_origin_present():
-    # The CloudFront VPC origin to the internal ALB must be wired.
-    _template().resource_count_is("AWS::CloudFront::VpcOrigin", 1)
+def test_no_vpc_origin():
+    # Finding-3 remediation: the CloudFront VPC origin is gone, replaced by the
+    # API Gateway HTTP API + VPC Link path.
+    _template().resource_count_is("AWS::CloudFront::VpcOrigin", 0)
+
+
+def test_api_gateway_http_api_vpc_link_and_integration():
+    tmpl = _template()
+    # The HTTP API, its VPC Link, and the ALB integration are all present.
+    tmpl.has_resource_properties(
+        "AWS::ApiGatewayV2::Api",
+        {"Name": "video-api", "ProtocolType": "HTTP"},
+    )
+    tmpl.resource_count_is("AWS::ApiGatewayV2::VpcLink", 1)
+    # VPC_LINK integration to the ALB HTTP listener.
+    tmpl.has_resource_properties(
+        "AWS::ApiGatewayV2::Integration",
+        {"ConnectionType": "VPC_LINK", "IntegrationMethod": "ANY"},
+    )
+
+
+def test_api_route_strips_api_prefix():
+    tmpl = _template()
+    # Route ANY /api/{proxy+} exists, and the integration overwrites the path to
+    # /${request.path.proxy} so the ALB (and FastAPI) see the unprefixed route.
+    tmpl.has_resource_properties(
+        "AWS::ApiGatewayV2::Route",
+        {"RouteKey": "ANY /api/{proxy+}"},
+    )
+    tmpl.has_resource_properties(
+        "AWS::ApiGatewayV2::Integration",
+        {
+            "RequestParameters": {
+                "overwrite:path": "/${request.path.proxy}"
+            }
+        },
+    )
+
+
+def test_alb_is_internal():
+    # The ALB must stay private (internet_facing=False -> Scheme=internal).
+    tmpl = _template()
+    tmpl.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        {"Scheme": "internal"},
+    )
+
+
+def test_api_behavior_points_at_apigw_origin_over_https():
+    tmpl = _template()
+    dist = next(iter(tmpl.find_resources("AWS::CloudFront::Distribution").values()))
+    config = dist["Properties"]["DistributionConfig"]
+    behaviors = config["CacheBehaviors"]
+    api = next(b for b in behaviors if b["PathPattern"] == "/api/*")
+    target_id = api["TargetOriginId"]
+    origin = next(
+        o for o in config["Origins"] if o["Id"] == target_id
+    )
+    # The /api origin is a custom (HTTP) origin reached HTTPS-only, and its
+    # domain is the API Gateway execute-api endpoint -- not the ALB.
+    assert origin["CustomOriginConfig"]["OriginProtocolPolicy"] == "https-only"
+    assert "execute-api" in json.dumps(origin["DomainName"])
+
+
+def test_api_origin_request_policy_excludes_host_header():
+    # An API Gateway custom origin needs its own execute-api Host, so the
+    # /api/* behaviour must use the AllViewerExceptHostHeader managed policy.
+    tmpl = _template()
+    dist = next(iter(tmpl.find_resources("AWS::CloudFront::Distribution").values()))
+    behaviors = dist["Properties"]["DistributionConfig"]["CacheBehaviors"]
+    api = next(b for b in behaviors if b["PathPattern"] == "/api/*")
+    # b689... is the fixed managed-policy id for AllViewerExceptHostHeader.
+    assert api["OriginRequestPolicyId"] == "b689b0a8-53d0-40ab-baf2-68738e2966ac"
 
 
 def test_dlq_marker_lambda_and_event_source():
