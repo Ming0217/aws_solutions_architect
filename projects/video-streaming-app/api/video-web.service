@@ -1,0 +1,38 @@
+[Unit]
+Description=Video streaming web tier (FastAPI / gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=appuser
+Group=appuser
+# Env (INPUT_BUCKET, OUTPUT_BUCKET, TABLE_NAME, ARTIFACT_BUCKET,
+# CF_KEY_SECRET_ARN, CF_DOMAIN, CF_KEY_PAIR_ID, PLAYBACK_MODE, AWS_REGION,
+# MAX_UPLOAD_BYTES) is written by user-data.sh from the instance's CDK-injected
+# values -- the same var names the app reads locally. CF_SIGNING_KEY_FILE is
+# NEVER set here: in AWS the private PEM comes from Secrets Manager.
+EnvironmentFile=/etc/video-web.env
+WorkingDirectory=/opt/video-web
+# gunicorn with uvicorn workers on 8000. The bind is the instance's private
+# interface (0.0.0.0:8000) because the internal ALB connects to the instance's
+# private IP -- a loopback bind would make the target unreachable. This is NOT
+# a public exposure: the host is in a private subnet with no public IP, and
+# web-sg admits TCP 8000 ONLY from alb-sg (FEAT-001), which is itself reachable
+# only from the CloudFront VPC-origin ENIs. Local dev instead binds loopback
+# (uvicorn --host 127.0.0.1 --port 8000); see README.md.
+ExecStart=/opt/video-web/.venv/bin/gunicorn main:app \
+    --workers 3 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:8000 \
+    --timeout 120
+Restart=always
+RestartSec=5
+# Logs go to the CloudWatch group /video/web via the CloudWatch agent
+# (journald -> CloudWatch) configured in user-data.sh.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=video-web
+
+[Install]
+WantedBy=multi-user.target

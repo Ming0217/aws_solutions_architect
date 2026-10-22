@@ -1,0 +1,6 @@
+pytest
+ruff
+mypy
+# boto3 is test-only for the DLQ-marker Lambda unit tests (botocore.stub.Stubber);
+# the Lambda runtime provides boto3 at deploy, so it is not bundled with the asset.
+boto3

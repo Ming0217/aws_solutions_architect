@@ -1,0 +1,8 @@
+fastapi>=0.110,<1
+uvicorn[standard]>=0.29,<1
+gunicorn>=21,<24
+boto3>=1.34,<2
+cryptography>=42,<46
+python-multipart>=0.0.9,<1
+# Required by starlette's TestClient (fastapi.testclient) used in tests/smoke.
+httpx>=0.27,<1

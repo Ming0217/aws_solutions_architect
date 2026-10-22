@@ -9,7 +9,7 @@ services:
   - dynamodb
   - sqs
   - ec2
-status: built-and-tested-live
+status: v1-built-and-tested-live; hardened-deployed-tested-torndown-2026-10-22 (one open finding: CloudFront VPC-origin→ALB)
 tags:
   - aws
   - project
@@ -23,6 +23,26 @@ tags:
 > Part of the [H2 2026 AWS OKR](../README.md) — counts toward KR1 (documented
 > architecture), KR2 (working project — **project 3 of 3**), KR3
 > (Well-Architected), and KR4 (walkthrough).
+
+> **Hardened build (Phase 2) — status.** The tutorial v1 below was **console-built
+> and verified live**; those console resources have since been shut down. The
+> hardened rebuild is **AWS CDK (Python)** — three stacks that synthesize — with
+> the FastAPI web tier + vanilla SPA **runnable locally** against env-injected
+> resource names (see [`video-streaming-app/LOCAL_DEV.md`](./video-streaming-app/LOCAL_DEV.md)).
+> **No `cdk deploy` or `cdk destroy` was run in this workflow — nothing was
+> provisioned in AWS this pass.** How each hardening flag is closed by the
+> as-built code is in [the architecture walkthrough](./video-streaming-app/walkthrough.md)
+> and [`video-streaming-app/DESIGN.md`](./video-streaming-app/DESIGN.md).
+>
+> **Confirmed branch-point decisions:** IaC = **CDK in Python**; transcode compute
+> stays faithful (hardened EC2/FFmpeg worker); frontend = **vanilla HTML/JS static
+> SPA** verified locally first; **no auth** this pass. Playback uses **CloudFront
+> signed COOKIES in production** (confirmed) — scoping `/media/{video_id}/*` with
+> one signing op for the whole HLS fan-out — and signed URLs in local dev (a
+> browser on `127.0.0.1` can't carry a CloudFront-domain cookie). This meets the
+> "CloudFront + signed URLs" spec substance (private Output bucket, CloudFront-gated
+> playback, per-video-scoped credentials); only the production delivery vehicle
+> differs. See the walkthrough §5 for the full rationale.
 
 ## Use case / goal
 
@@ -420,7 +440,19 @@ Web-Server + Worker-Server (Amazon Linux 2023, t3.micro). _Role:_ `iam_role_vide
 
 ## Cleanup
 
-- [ ] Tore down resources to avoid charges
+- [x] **Tutorial v1 (console) resources shut down** — the console-built build was
+  torn down earlier; nothing from v1 is still running.
+- [x] **Hardened Phase 2 — deployed, tested live, and torn down (2026-10-22).**
+  `cdk deploy` to `us-east-1`, exercised end-to-end, then `cdk destroy` the same
+  day with a verified-nothing-lingers sweep (stacks, `video-*` buckets,
+  `VideoCatalog`, both queues, the signing-key secret, `/video/*` log groups, the
+  CloudFront distribution, both ASGs). The live pass fixed two runtime defects
+  (Python 3.9→3.11 on the AMI; CloudFront bare-root 403) and surfaced one open
+  issue — CloudFront **VPC-origin → internal ALB** won't carry `/api` traffic
+  despite a correct SG/port/NACL/health (a newer-feature gotcha). Full record,
+  root-cause evidence, and the remediation are in
+  [the walkthrough §9a](./video-streaming-app/walkthrough.md). The fix is a
+  code/`synth` change; re-proving it live is a future one-command redeploy.
 
 ## Walkthrough summary
 

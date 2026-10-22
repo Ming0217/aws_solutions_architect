@@ -1,0 +1,30 @@
+[Unit]
+Description=Video transcode worker (FFmpeg/SQS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=appuser
+Group=appuser
+# Env (QUEUE_URL, INPUT_BUCKET, OUTPUT_BUCKET, TABLE_NAME, ASG_NAME,
+# LIFECYCLE_HOOK_NAME, AWS_REGION, FFMPEG_BIN) is written by user-data.sh from
+# the instance's CDK-injected values.
+EnvironmentFile=/etc/video-worker.env
+WorkingDirectory=/opt/video-worker
+ExecStart=/opt/video-worker/.venv/bin/python /opt/video-worker/worker.py
+Restart=always
+RestartSec=5
+# Graceful drain: give the SIGTERM handler time to finish the in-flight
+# transcode and call CompleteLifecycleAction before systemd escalates to KILL.
+# Matches the ASG lifecycle hook heartbeat (900s, set in FEAT-005).
+TimeoutStopSec=900
+KillSignal=SIGTERM
+# Logs go to the CloudWatch group /video/worker via the CloudWatch agent
+# (journald -> CloudWatch) configured in user-data.sh.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=video-worker
+
+[Install]
+WantedBy=multi-user.target

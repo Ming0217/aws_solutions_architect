@@ -1,0 +1,62 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "title": "CloudFront signer has no wired source for CloudFront-Key-Pair-Id; CfnOutputs give the key group id, env vars omit the public key id",
+      "location": "CloudFront + signed-cookie playback; Signing-key pair lifecycle; Clean teardown + outputs; Local-dev env list",
+      "fix": "Add CfnOutput CfPublicKeyId=public_key.public_key_id and inject CF_KEY_PAIR_ID into the web tier (launch-template env + local env list); use it for the Key-Pair-Id field. Keep CfKeyGroupId only for the trusted-key-group reference."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "Out-of-band secret population vs. web-tier startup read: ordering and recovery unspecified (app down after clean deploy until an unspecified manual step)",
+      "location": "Signing-key pair lifecycle (step 3); Signing-key caching",
+      "fix": "Make the signing-key load lazy-with-retry (start healthy, fetch on first play-url), OR state ELB health-check type + a numbered deploy order (deploy -> put-secret-value -> ASG replaces initial unhealthy instances)."
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "title": "Local-dev HLS segment fetches are cross-origin to CloudFront but no media CORS is configured, breaking the stated local playback requirement",
+      "location": "Local-dev approach (signed-URL playback); CloudFront + signed-cookie playback (withCredentials note)",
+      "fix": "Either add a CloudFront ResponseHeadersPolicy CORS on /media/* (plus S3 CORS) allowing the localhost dev origin, or proxy segment bytes through the local API in local mode so all fetches are same-origin. Note production (same-origin) needs none."
+    },
+    {
+      "id": 4,
+      "severity": "MEDIUM",
+      "title": "Production playback deviates from the settled decision (signed cookies vs signed URLs) and the required user confirmation is unrecorded",
+      "location": "CloudFront + signed-cookie playback callout; round-2/round-3 Finding 4",
+      "fix": "Record an explicit user decision: confirm signed cookies for production (remove the hedge, mark settled) OR implement per-object signed URLs with playlist rewrite in production as well."
+    },
+    {
+      "id": 5,
+      "severity": "MEDIUM",
+      "title": "ALB-ingress linchpin (CloudFront VPC-origin ENIs source from private-subnet CIDRs) is an unverified claim about AWS behavior",
+      "location": "VPC security groups -> alb-sg; round-3 Finding 1",
+      "fix": "Verify against CloudFront VPC origins docs/console which subnets the VPC-origin ENIs use and their source IPs; pin ALB and VPC-origin subnet selection to the same explicit set so the CIDR rule is provably correct. Also confirm cloudfront.VpcOrigin exists in aws-cdk-lib ^2.170.0."
+    },
+    {
+      "id": 6,
+      "severity": "NIT",
+      "title": "EBS volume sizing unspecified for both ASGs despite up to 2 GB uploads/transcodes",
+      "location": "Web-tier ASG sizing; Worker ASG; Input validation (MAX_UPLOAD_BYTES 2 GB)",
+      "fix": "Set explicit block_devices (gp3) on both launch templates sized to the upload cap plus headroom, or lower MAX_UPLOAD_BYTES to match a stated volume size."
+    },
+    {
+      "id": 7,
+      "severity": "NIT",
+      "title": "Local-dev playlist delivery described two contradictory ways (CloudFront signed URL vs API-served rewritten playlist)",
+      "location": "Local-dev approach -> Local playback uses signed URLs",
+      "fix": "State that local play-url returns a URL to the local API's rewritten-playlist endpoint, whose segment lines are absolute CloudFront signed URLs; drop the 'returns a CloudFront signed URL for the playlist' phrasing."
+    },
+    {
+      "id": 8,
+      "severity": "NIT",
+      "title": "Deployed web/worker env injection mechanism not stated",
+      "location": "Local-dev approach (env injection); FastAPI web tier",
+      "fix": "State that launch-template user-data writes a systemd EnvironmentFile from CDK-resolved references so deployed and local paths read identical env vars."
+    }
+  ],
+  "reviewDoc": "/Users/mingxmh/Desktop/Desktop/team_goals/sa_training/aws_solutions_architect/.worktrees/video-streaming-hardening/.agents/tasks/design-review.md"
+}
