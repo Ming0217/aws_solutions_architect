@@ -9,7 +9,7 @@ services:
   - dynamodb
   - sqs
   - ec2
-status: v1-built-and-tested-live; hardened-iac-local-runnable-not-deployed
+status: v1-built-and-tested-live; hardened-deployed-tested-torndown-2026-10-22 (one open finding: CloudFront VPC-origin→ALB)
 tags:
   - aws
   - project
@@ -442,12 +442,17 @@ Web-Server + Worker-Server (Amazon Linux 2023, t3.micro). _Role:_ `iam_role_vide
 
 - [x] **Tutorial v1 (console) resources shut down** — the console-built build was
   torn down earlier; nothing from v1 is still running.
-- [n/a] **Hardened Phase 2** — not deployed in this workflow, so there is nothing
-  to tear down. The CDK stacks set `removalPolicy=DESTROY` (+ `autoDeleteObjects`
-  on buckets) and the worker ASG scales to zero, so a single `cdk destroy` in
-  reverse stack order removes everything **if/when** an operator deploys it (the
-  `cdk deploy`/`cdk destroy` runbook is in
-  [`video-streaming-app/iac/README.md`](./video-streaming-app/iac/README.md)).
+- [x] **Hardened Phase 2 — deployed, tested live, and torn down (2026-10-22).**
+  `cdk deploy` to `us-east-1`, exercised end-to-end, then `cdk destroy` the same
+  day with a verified-nothing-lingers sweep (stacks, `video-*` buckets,
+  `VideoCatalog`, both queues, the signing-key secret, `/video/*` log groups, the
+  CloudFront distribution, both ASGs). The live pass fixed two runtime defects
+  (Python 3.9→3.11 on the AMI; CloudFront bare-root 403) and surfaced one open
+  issue — CloudFront **VPC-origin → internal ALB** won't carry `/api` traffic
+  despite a correct SG/port/NACL/health (a newer-feature gotcha). Full record,
+  root-cause evidence, and the remediation are in
+  [the walkthrough §9a](./video-streaming-app/walkthrough.md). The fix is a
+  code/`synth` change; re-proving it live is a future one-command redeploy.
 
 ## Walkthrough summary
 

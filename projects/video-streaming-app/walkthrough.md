@@ -215,10 +215,57 @@ see the build doc).
   GSI query, signing (TTL + scoped path), `ClientError`→HTTP mapping, input
   validation; worker `video_id` extraction, idempotency skip, FFmpeg argv, and the
   `Failed`-on-nonzero-exit path; and the DLQ-marker parse → `UpdateItem`.
-- **Not deployed in this workflow.** No `cdk deploy` and no `cdk destroy` were run
-  here; nothing was provisioned in AWS. The live end-to-end run (upload → `Queued`
-  → worker → `Ready` → signed-cookie playback) and the two failure tests remain a
-  deliberate, separate operator action, documented in [`iac/README.md`](./iac/README.md).
+## 9a. Live deployment record (2026-10-22)
+
+Deployed to account `678602035067` / `us-east-1` via `cdk deploy`, tested, and
+torn down the same day. The live run validated the architecture **and surfaced
+three real defects that `synth` + mocked unit tests could not** — the whole point
+of a live pass (same spirit as PhotoShare's MySQL-8 crash).
+
+**Verified working live:** all three stacks deploy clean (~18 min, CloudFront the
+long pole); S3+OAC serves the SPA and `config.json`; the Output bucket stays
+private; SSM Session Manager reaches the private instances (no port 22); the web
+ASG target is healthy; the signing-key-at-boot gate works (`/health` 503 until the
+secret is loaded, then 200); DynamoDB/SQS/DLQ/secret all present; `cdk destroy`
+removes everything cleanly.
+
+**Finding 1 — Python runtime mismatch (fixed live).** The web gunicorn worker
+crashed: `ImportError: cannot import name 'UTC' from 'datetime'`. Amazon Linux
+2023's default `python3` is **3.9**, but the app uses `datetime.UTC` (3.11+). The
+worker had the same latent gap plus **no venv and no boto3 install** (it had never
+run — scale-to-zero). Fix: both user-data scripts now install **python3.11**,
+build the venv with it, and the worker ships + installs its `requirements.txt`;
+`video-worker.service` runs the venv interpreter. *Lesson: `synth` and mocked
+pytest run on the build host's Python, never the AMI's — exercise the real runtime.*
+
+**Finding 2 — CloudFront bare-root 403 (fixed live).** `/index.html` served 200
+but `/` returned 403: a prior fix removed the distribution-wide `403→index.html`
+(needed so `/media` signed-cookie 403s reach the player) and nothing covered the
+root. Fix: set `default_root_object=index.html`.
+
+**Finding 3 — CloudFront VPC-origin → internal ALB will not pass traffic (open).**
+Every `/api/*` request returns a **30-second CloudFront 504**, while the app
+answers instantly on the instance itself (`localhost:8000/health`→200,
+`/api/videos`→404). Exhaustively ruled out as causes, all verified correct live:
+the VPC origin is `http-only` port **80**, the ALB listener is HTTP **80**
+(internal, active), the target group is **healthy** on 8000, the VPC-origin ENIs
+sit at **10.0.2.9 / 10.0.3.76** inside the `alb-sg`-allowed `10.0.2.0/24` +
+`10.0.3.0/24` (and broadening ingress to the whole `10.0.0.0/16` changed nothing),
+and the subnet NACLs are default allow-all. So a textbook-correct configuration
+of the **newer CloudFront VPC-origin feature** still would not carry traffic from
+the edge to the private ALB. A secondary `/api`-prefix mismatch waits behind it
+(CloudFront forwards `/api/videos` but the app serves `/videos`).
+*Remediation (not yet applied): replace the VPC-origin hop with a better-trodden
+path — an internet-facing ALB restricted to the `com.amazonaws.global.cloudfront.origin-facing`
+managed prefix list, or front `/api` with API Gateway — and strip/align the `/api`
+prefix. Fixable in code + `synth`-verifiable offline; re-proving it live is a
+future one-command redeploy.*
+
+**Not re-validated end-to-end:** because of Finding 3, the browser upload →
+`Queued` → worker → `Ready` → signed-cookie playback run (and the DLQ/`Failed`
+failure test) were not completed live; they remain pending the Finding-3 fix +
+a redeploy. Teardown was verified (no lingering stacks/buckets/table/queues/
+secret/log groups/distribution/ASGs).
 
 ## 10. Takeaways
 
