@@ -1023,6 +1023,38 @@ AWS-managed `execute-api` HTTPS endpoint, used as an `HttpOrigin` with
   routes unprefixed) keeps working.
 
 This supersedes round-2 response 6 and round-3 response 1 (both of which described
-the now-removed VPC-origin + private-CIDR-ingress approach). Live end-to-end
-re-validation (upload → `Ready` → signed-cookie playback) remains a future
-one-command redeploy.
+the now-removed VPC-origin + private-CIDR-ingress approach). **Confirmed live on
+the second pass (2026-10-22):** `GET /api/videos` → `200` in ~0.13 s through this
+path, ALB still `internal` (see `walkthrough.md` §9a "Second live pass").
+
+## Post-deploy remediation — Finding 4 (`/media/*` → `output/` prefix mismatch)
+
+The second live pass surfaced a playback defect that `synth` + mocked tests could
+not: a video reached `Ready` but stalled at 0:00. The signed-cookie machinery was
+**correct** — CloudFront accepted the cookies and forwarded to S3; **S3** returned
+the 403 because the requested key did not exist. The public playback contract is
+`/media/<id>/*` (the API signs cookies and returns play-urls under it), but the
+worker writes HLS to the Output bucket under `output/<id>/*`, and the `/media/*`
+behaviour had an empty origin path — so CloudFront asked S3 for
+`media/<id>/playlist.m3u8`, a key that is never written. The `/media/` → `output/`
+mapping was simply never wired.
+
+**Remediation (applied in code, synth-verified, confirmed live).** A CloudFront
+**viewer-request Function** on the `/media/*` behaviour rewrites the `/media/`
+prefix to `/output/` so the edge fetches the real key. Origin path cannot do this:
+it *prepends* to the URI and cannot strip the matched `/media` segment. `cdk synth`
+shows the `AWS::CloudFront::Function`; live verification served the real keys and
+re-fetched through the edge with signed cookies (manifest + segment both `200`).
+
+## Future enhancements (out of scope this pass)
+
+- **Video thumbnails / poster frames.** Gallery cards render a placeholder, not a
+  frame of the video. A proper preview needs the worker to extract one frame at
+  transcode time (`ffmpeg -frames:v 1`) and store it on a **publicly-served path**
+  (the site bucket, behind the default behaviour — *not* `/media/*`, which is
+  signed-cookie gated and so cannot be loaded by a plain gallery `<img>`); the API
+  would then return `thumbnail_url` (the SPA already renders it if present). Costs
+  a worker + API + IAM change and a redeploy, so it was deferred — it is UI polish,
+  not a hardening objective.
+- **Auth (Cognito)**, customer-managed KMS, and WAF on CloudFront remain the
+  security follow-ups already noted in the Well-Architected mapping.

@@ -312,6 +312,27 @@ class VideoAppStack(Stack):
         media_origin = origins.S3BucketOrigin.with_origin_access_control(
             output_bucket_ref
         )
+        # The public playback contract is /media/<id>/* (the API signs cookies
+        # and returns play-urls under that prefix), but the worker writes the
+        # HLS output to the output bucket under output/<id>/*. Nothing mapped
+        # one to the other, so CloudFront asked S3 for media/<id>/playlist.m3u8
+        # (a key that never exists) and S3 returned 403 AFTER the signed-cookie
+        # check passed -- playback failed with status "Ready". A viewer-request
+        # CloudFront Function rewrites the /media/ prefix to /output/ so the
+        # edge fetches the real key. Origin-path cannot do this: it prepends to
+        # the URI, it cannot strip the matched /media segment.
+        media_prefix_rewrite = cloudfront.Function(
+            self, "MediaPrefixRewrite",
+            comment="Rewrite public /media/<id>/* to output/<id>/* S3 keys",
+            runtime=cloudfront.FunctionRuntime.JS_2_0,
+            code=cloudfront.FunctionCode.from_inline(
+                "function handler(event) {\n"
+                "  var request = event.request;\n"
+                "  request.uri = request.uri.replace('/media/', '/output/');\n"
+                "  return request;\n"
+                "}\n"
+            ),
+        )
         # /api/* origin: the API Gateway HTTP API over HTTPS. HTTPS_ONLY keeps
         # the CloudFront->origin hop (which carries the signed-cookie
         # Set-Cookie) encrypted; the execute-api endpoint's AWS-managed cert
@@ -340,6 +361,10 @@ class VideoAppStack(Stack):
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     trusted_key_groups=[key_group],
                     response_headers_policy=media_cors,
+                    function_associations=[cloudfront.FunctionAssociation(
+                        function=media_prefix_rewrite,
+                        event_type=cloudfront.FunctionEventType.VIEWER_REQUEST,
+                    )],
                 ),
                 "/api/*": cloudfront.BehaviorOptions(
                     origin=api_origin,

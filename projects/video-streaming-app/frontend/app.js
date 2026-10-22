@@ -377,6 +377,9 @@ async function onUploadSubmit(event) {
     els.uploadForm.reset();
     updateDropzoneFilename();
     await refreshGallery();
+    // Close the modal on success so the new video is visible in the library.
+    els.uploadStatus.textContent = "";
+    closeUploadModal();
   } catch (err) {
     els.uploadStatus.textContent = "Upload failed.";
     console.error(err);

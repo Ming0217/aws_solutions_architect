@@ -246,7 +246,7 @@ but `/` returned 403: a prior fix removed the distribution-wide `403→index.htm
 (needed so `/media` signed-cookie 403s reach the player) and nothing covered the
 root. Fix: set `default_root_object=index.html`.
 
-**Finding 3 — CloudFront VPC-origin → internal ALB will not pass traffic (open).**
+**Finding 3 — CloudFront VPC-origin → internal ALB will not pass traffic (diagnosed first pass; remediation confirmed live in the second pass — see below).**
 Every `/api/*` request returns a **30-second CloudFront 504**, while the app
 answers instantly on the instance itself (`localhost:8000/health`→200,
 `/api/videos`→404). Exhaustively ruled out as causes, all verified correct live:
@@ -258,7 +258,7 @@ and the subnet NACLs are default allow-all. So a textbook-correct configuration
 of the **newer CloudFront VPC-origin feature** still would not carry traffic from
 the edge to the private ALB. A secondary `/api`-prefix mismatch waits behind it
 (CloudFront forwards `/api/videos` but the app serves `/videos`).
-**Remediation — APPLIED IN CODE, `synth`-verified (not yet live-redeployed).**
+**Remediation — APPLIED IN CODE, `synth`-verified, and later live-redeployed and confirmed (see "Second live pass" below).**
 The VPC-origin hop is removed and replaced with a well-trodden path: CloudFront
 `/api/*` → an **API Gateway HTTP API** (its AWS-managed `execute-api` HTTPS
 endpoint, used as an `HttpOrigin` with `protocol_policy=HTTPS_ONLY`) → a **VPC
@@ -284,11 +284,45 @@ hop carrying the signed-cookie `Set-Cookie`, and stays on the single CloudFront
 domain (no CORS/cross-domain-cookie issues). Re-proving it live is a future
 one-command redeploy.
 
-**Not re-validated end-to-end:** the browser upload → `Queued` → worker →
-`Ready` → signed-cookie playback run (and the DLQ/`Failed` failure test) were not
-completed live — they ran into Finding 3 during the deploy and remain pending a
-redeploy on the remediated code. Teardown was verified (no lingering
-stacks/buckets/table/queues/secret/log groups/distribution/ASGs).
+### Second live pass (2026-10-22) — remediation confirmed + end-to-end validated
+
+The remediated code was redeployed and run end-to-end. Results:
+
+- **Finding 3 confirmed fixed.** `GET /api/videos` returned `200 {"videos":[]}`
+  in ~0.13 s through the new CloudFront → API Gateway HTTP API → VPC Link →
+  internal ALB → FastAPI path. The VPC-origin 504 is gone; the ALB stayed
+  `internal`.
+- **Finding 4 — `/media/*` → `output/` prefix mismatch (found and fixed this
+  pass).** A video reached `Ready`, but playback stalled at 0:00. The signed
+  cookies, key group, and public-key↔private-key pair all verified **correct** —
+  CloudFront accepted the cookies and forwarded to S3 (`server: AmazonS3`), and
+  **S3** returned the 403. Root cause: the worker writes HLS to the Output bucket
+  under `output/<id>/…`, but the `/media/*` behaviour had an empty origin path, so
+  CloudFront asked S3 for `media/<id>/playlist.m3u8` — a key that never exists.
+  Nothing mapped the public `/media/` prefix to the stored `output/` prefix. Fix:
+  a CloudFront **viewer-request Function** on `/media/*` rewrites `/media/` →
+  `/output/` (origin path cannot do this — it prepends and cannot strip the
+  matched `/media` segment). `cdk synth` confirms the `AWS::CloudFront::Function`;
+  verified live by serving the real keys and re-fetching through the edge with the
+  signed cookies (manifest `200 application/vnd.apple.mpegurl`, segment
+  `200 video/mp2t`). *Lesson: a correct signing path still fails if the public URL
+  prefix and the stored S3 key prefix were never reconciled — and a post-cookie
+  403 is the origin's, not the signer's.*
+- **Two UI fixes.** The upload modal now auto-closes on a successful upload
+  (`app.js` `closeUploadModal()` on the success path), and `[hidden]` is forced
+  with `display:none` so the player/upload modals stay closed until opened.
+- **End-to-end validated.** Browser upload → `Queued` → EC2/FFmpeg worker
+  cold-start (ASG 0→1) → `Ready` → **signed-cookie HLS playback in the browser**.
+  See [`docs/screenshots/01-landing-hero.png`](./docs/screenshots/01-landing-hero.png)
+  (landing page) and [`docs/screenshots/02-playback.png`](./docs/screenshots/02-playback.png)
+  (the clip playing in the player modal).
+- **Thumbnails deferred (future enhancement).** Gallery cards show a placeholder,
+  not a poster frame — the pipeline generates no thumbnail and all media sits
+  behind signed cookies, so a proper preview needs a frame extracted at transcode
+  time and stored on a public (site-bucket) path. Scoped as a future enhancement,
+  not a hardening objective (see DESIGN.md).
+- **Teardown re-verified** — `cdk destroy --all` removed every stack with no
+  lingering buckets/table/queues/secret/log groups/distribution/ASGs.
 
 ## 10. Takeaways
 
