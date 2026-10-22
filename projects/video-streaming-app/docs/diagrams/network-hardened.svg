@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 760" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#475569"/>
+    </marker>
+    <marker id="arrowG" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#0e7490"/>
+    </marker>
+    <marker id="arrowO" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#c2410c"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="980" height="760" fill="#f8fafc"/>
+  <text x="24" y="34" font-size="20" font-weight="700" fill="#0f172a">Video Streaming Platform — Hardened VPC (private-by-default)</text>
+  <text x="24" y="56" font-size="12.5" fill="#64748b">1 VPC · 10.0.0.0/16 · 2 AZs · single NAT · public subnets hold ONLY the NAT; ALB, web ASG, worker ASG all private</text>
+
+  <!-- Internet / edge (outside VPC) -->
+  <rect x="24" y="78" width="300" height="78" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="36" y="99" font-size="12" font-weight="700" fill="#4338ca">INTERNET / EDGE (outside the VPC)</text>
+  <text x="36" y="119" font-size="11.5" fill="#1e293b">User → CloudFront → API Gateway (HTTP API, HTTPS)</text>
+  <text x="36" y="136" font-size="11.5" fill="#1e293b">→ VPC Link (ENIs in private subnets)</text>
+  <text x="36" y="151" font-size="10.5" fill="#64748b">SPA /* · API /api/* · media /media/* (signed cookies)</text>
+
+  <!-- IGW -->
+  <rect x="360" y="86" width="120" height="44" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="1.5"/>
+  <text x="420" y="104" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">Internet</text>
+  <text x="420" y="120" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">Gateway</text>
+
+  <!-- VPC boundary -->
+  <rect x="24" y="176" width="932" height="500" rx="14" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+  <text x="40" y="198" font-size="13" font-weight="700" fill="#334155">VPC  10.0.0.0/16</text>
+
+  <!-- AZ A column -->
+  <rect x="40" y="212" width="440" height="372" rx="10" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="4 3"/>
+  <text x="54" y="232" font-size="12" font-weight="700" fill="#475569">AZ us-east-1a</text>
+  <!-- AZ B column -->
+  <rect x="500" y="212" width="440" height="372" rx="10" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="4 3"/>
+  <text x="514" y="232" font-size="12" font-weight="700" fill="#475569">AZ us-east-1b</text>
+
+  <!-- PUBLIC subnet A -->
+  <rect x="54" y="244" width="412" height="92" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.3"/>
+  <text x="66" y="263" font-size="11.5" font-weight="700" fill="#92400e">PUBLIC subnet 10.0.1.0/24  (route 0.0.0.0/0 → IGW)</text>
+  <rect x="66" y="272" width="150" height="52" rx="7" fill="#fff" stroke="#d97706"/>
+  <text x="141" y="294" font-size="12" font-weight="700" fill="#9a3412" text-anchor="middle">NAT Gateway</text>
+  <text x="141" y="312" font-size="10" fill="#b45309" text-anchor="middle">(only thing here)</text>
+
+  <!-- PUBLIC subnet B -->
+  <rect x="514" y="244" width="412" height="92" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.3"/>
+  <text x="526" y="263" font-size="11.5" font-weight="700" fill="#92400e">PUBLIC subnet 10.0.3.0/24  (route 0.0.0.0/0 → IGW)</text>
+  <text x="720" y="300" font-size="11" fill="#b45309" text-anchor="middle" font-style="italic">empty — holds nothing</text>
+  <text x="720" y="316" font-size="10" fill="#b45309" text-anchor="middle">(single NAT lives in AZ-a)</text>
+
+  <!-- PRIVATE subnet A -->
+  <rect x="54" y="348" width="412" height="224" rx="8" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.3"/>
+  <text x="66" y="367" font-size="11.5" font-weight="700" fill="#075985">PRIVATE subnet 10.0.2.0/24  (no route to IGW)</text>
+  <rect x="66" y="378" width="188" height="42" rx="7" fill="#fff" stroke="#0369a1"/>
+  <text x="160" y="404" font-size="11.5" font-weight="700" fill="#075985" text-anchor="middle">Internal ALB</text>
+  <rect x="66" y="428" width="188" height="42" rx="7" fill="#fff" stroke="#0369a1"/>
+  <text x="160" y="454" font-size="11.5" font-weight="700" fill="#075985" text-anchor="middle">Web ASG (FastAPI :8000)</text>
+  <rect x="66" y="478" width="188" height="42" rx="7" fill="#fff" stroke="#0369a1"/>
+  <text x="160" y="504" font-size="11.5" font-weight="700" fill="#075985" text-anchor="middle">Worker ASG (FFmpeg)</text>
+
+  <!-- VPC endpoints box (private A) -->
+  <rect x="266" y="378" width="188" height="142" rx="7" fill="#ecfeff" stroke="#0e7490" stroke-dasharray="4 2"/>
+  <text x="360" y="396" font-size="10.5" font-weight="700" fill="#0e7490" text-anchor="middle">VPC ENDPOINTS</text>
+  <text x="276" y="414" font-size="10" fill="#155e75">Gateway (route, free):</text>
+  <text x="276" y="428" font-size="10" fill="#0f172a">· S3   · DynamoDB</text>
+  <text x="276" y="448" font-size="10" fill="#155e75">Interface (ENI + SG):</text>
+  <text x="276" y="462" font-size="10" fill="#0f172a">· SQS  · Secrets Mgr</text>
+  <text x="276" y="476" font-size="10" fill="#0f172a">· SSM ·ssmmessages</text>
+  <text x="276" y="490" font-size="10" fill="#0f172a">· ec2messages</text>
+  <text x="276" y="508" font-size="9.5" fill="#0e7490" font-style="italic">no internet — AWS backbone</text>
+
+  <!-- PRIVATE subnet B -->
+  <rect x="514" y="348" width="412" height="224" rx="8" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.3"/>
+  <text x="526" y="367" font-size="11.5" font-weight="700" fill="#075985">PRIVATE subnet 10.0.4.0/24  (no route to IGW)</text>
+  <rect x="526" y="378" width="188" height="42" rx="7" fill="#fff" stroke="#0369a1"/>
+  <text x="620" y="404" font-size="11.5" font-weight="700" fill="#075985" text-anchor="middle">Internal ALB (2nd AZ)</text>
+  <rect x="526" y="428" width="188" height="42" rx="7" fill="#fff" stroke="#0369a1"/>
+  <text x="620" y="454" font-size="11.5" font-weight="700" fill="#075985" text-anchor="middle">Web ASG (2nd AZ)</text>
+  <rect x="526" y="478" width="188" height="42" rx="7" fill="#fff" stroke="#0369a1"/>
+  <text x="620" y="504" font-size="11.5" font-weight="700" fill="#075985" text-anchor="middle">Worker ASG (2nd AZ)</text>
+  <rect x="726" y="378" width="188" height="142" rx="7" fill="#ecfeff" stroke="#0e7490" stroke-dasharray="4 2"/>
+  <text x="820" y="396" font-size="10.5" font-weight="700" fill="#0e7490" text-anchor="middle">VPC ENDPOINTS</text>
+  <text x="820" y="446" font-size="10" fill="#155e75" text-anchor="middle">(same set, 2nd AZ</text>
+  <text x="820" y="462" font-size="10" fill="#155e75" text-anchor="middle">for interface ENIs)</text>
+
+  <!-- Edge -> VPC Link -> ALB (into private) -->
+  <path d="M174,156 L174,348" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+  <text x="182" y="230" font-size="9.5" fill="#475569">API GW → VPC Link</text>
+  <text x="182" y="244" font-size="9.5" fill="#475569">→ internal ALB</text>
+
+  <!-- ALB -> Web -->
+  <path d="M160,420 L160,428" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+  <!-- Web/Worker -> endpoints (AWS services, no internet) -->
+  <path d="M254,452 L266,452" stroke="#0e7490" stroke-width="1.6" fill="none" marker-end="url(#arrowG)"/>
+  <path d="M254,499 C262,499 262,470 266,470" stroke="#0e7490" stroke-width="1.6" fill="none" marker-end="url(#arrowG)"/>
+
+  <!-- Worker -> NAT -> IGW (general internet egress, outbound only) -->
+  <path d="M160,478 L160,324" stroke="#c2410c" stroke-width="1.6" fill="none" marker-end="url(#arrowO)" stroke-dasharray="5 3"/>
+  <path d="M216,296 L360,108" stroke="#c2410c" stroke-width="1.6" fill="none" marker-end="url(#arrowO)" stroke-dasharray="5 3"/>
+  <text x="168" y="344" font-size="9" fill="#c2410c">outbound only</text>
+
+  <!-- Legend -->
+  <rect x="40" y="596" width="900" height="68" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="52" y="615" font-size="11" font-weight="700" fill="#334155">Three egress paths from the private tier (SG gates each ENI):</text>
+  <line x1="56" y1="632" x2="86" y2="632" stroke="#c2410c" stroke-width="2" stroke-dasharray="5 3"/>
+  <text x="92" y="636" font-size="10.5" fill="#1e293b">① general internet (outbound only): route → NAT (public subnet) → IGW   e.g. pull pinned FFmpeg</text>
+  <line x1="56" y1="650" x2="86" y2="650" stroke="#0e7490" stroke-width="2"/>
+  <text x="92" y="654" font-size="10.5" fill="#1e293b">② AWS services, NO internet: gateway endpoint (route) → S3/DynamoDB · interface endpoint (ENI+SG) → SQS, Secrets Mgr, SSM×3 (Session Manager, no port 22)</text>
+  <text x="640" y="636" font-size="10.5" fill="#475569">SGs: alb-sg ← VPC Link only · web-sg ← alb-sg:8000 only · worker-sg = ZERO inbound</text>
+</svg>

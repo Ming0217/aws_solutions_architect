@@ -228,6 +228,68 @@ Ties to [[learning-plan/10-architecting/decoupling-sync-vs-async|synchronous dec
 [[learning-plan/10-architecting/stateless-compute-shared-state|stateless backends]] (the
 ASG freely adds/kills instances, so no request can depend on state on a specific server).
 
+## Internet-facing vs internal ALB (and "minimize public surface")
+
+Everything above assumes the **internet-facing** ALB — users hit the ALB directly.
+That's the standard, recommended pattern. But an ALB has a **scheme**, chosen at
+creation, and it's a real design decision:
+
+| | **Internet-facing ALB** | **Internal ALB** |
+| --- | --- | --- |
+| Public IP / DNS | Yes — publicly resolvable | **No** — private IPs only |
+| Lives in | **Public** subnets | **Private** subnets |
+| Who can reach it | Anyone on the internet | Only resources **inside the VPC** (or peered/VPN) |
+| Typical use | The app's front door | Behind another front door (CloudFront, API Gateway, another tier) |
+
+**Same ALB machinery** (listeners, target groups, health checks, ASG
+auto-registration) — the *only* difference is whether it has a public address.
+
+### The principle: minimize public surface (least exposure)
+
+This isn't a verbatim Well-Architected item, but it falls straight out of the
+**Security pillar** principles *"apply security at all layers"* and *reduce/
+minimize the attack surface*. Stated plainly:
+
+> **A resource gets a public address only if it has a concrete reason to be
+> reachable from the internet. Otherwise it's private.** Every additional
+> internet-exposed resource is one more thing to attack — and often a way to
+> **bypass** the controls you put on the intended path.
+
+### So which ALB scheme? It depends on *what fronts it*
+
+Neither scheme is "more correct" in the abstract — it's requirement-driven:
+
+- **Nothing else in front → internet-facing ALB** is the minimum public surface,
+  and correct. The ALB *is* the front door. (This is
+  [[projects/photoshare-app|PhotoShare]]: internet-facing ALB, servers private.
+  Adding CloudFront/API Gateway there would be unjustified complexity.)
+- **Something is already the public front door (e.g. CloudFront) → make the ALB
+  internal.** Once CloudFront is your single public entry point, a *public* ALB
+  would be a **second** front door: another internet-exposed endpoint to secure,
+  and a way for clients to **skip CloudFront** (its WAF, caching, signed-cookie
+  auth) by hitting the ALB's DNS directly. So the ALB is made internal → exactly
+  **one** way in. (This is [[projects/video-streaming-app|Video Streaming]]:
+  CloudFront is the only public thing because HLS signed-cookie playback needs a
+  single CloudFront domain; the ALB is therefore internal.)
+
+| | PhotoShare | Video Streaming |
+| --- | --- | --- |
+| Public front door | **Internet-facing ALB** | **CloudFront** (only public resource) |
+| ALB scheme | Internet-facing (public subnet) | **Internal** (private subnet) |
+| Why | Nothing else fronts it → ALB is the minimum surface | CloudFront already fronts it → a public ALB would be a bypassable 2nd door |
+
+### The tradeoff of going fully private
+
+"Private-by-default" has a real cost: reaching an **internal** ALB from an edge
+service (CloudFront) is harder than just pointing users at a public ALB. The video
+platform needed an extra hop — **CloudFront → API Gateway HTTP API → VPC Link →
+internal ALB** — to carry edge traffic to the private ALB (the VPC-origin feature
+didn't work; see its walkthrough §9a). That machinery is only justified because the
+requirements (CloudFront for HLS + SPA) already demanded CloudFront. **Don't add it
+unless a requirement already put a public front door in place.** See
+[[learning-plan/04-networking/vpc-connectivity-model|the connectivity-model note]]
+for how the private tier still reaches everything it needs.
+
 ## Tie-in: prefer stateless backends
 
 Load balancers can do **sticky sessions** (pin a user to one server), but the cleaner
