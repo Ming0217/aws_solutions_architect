@@ -22,9 +22,20 @@ if ! id appuser >/dev/null 2>&1; then
   useradd --system --no-create-home --shell /usr/sbin/nologin appuser
 fi
 
-# --- worker code -------------------------------------------------------------
+# --- Python 3.11 -------------------------------------------------------------
+# Amazon Linux 2023's default python3 is 3.9; run the worker on 3.11 in a venv
+# with boto3 installed (the service ExecStart uses the venv interpreter).
+dnf install -y python3.11
+
+# --- worker code + venv ------------------------------------------------------
 install -d -o appuser -g appuser /opt/video-worker
 install -o appuser -g appuser -m 0644 /tmp/worker.py /opt/video-worker/worker.py
+install -o appuser -g appuser -m 0644 /tmp/requirements.txt /opt/video-worker/requirements.txt
+
+python3.11 -m venv /opt/video-worker/.venv
+/opt/video-worker/.venv/bin/pip install --upgrade pip
+/opt/video-worker/.venv/bin/pip install -r /opt/video-worker/requirements.txt
+chown -R appuser:appuser /opt/video-worker/.venv
 
 # --- systemd EnvironmentFile from CDK-injected values ------------------------
 # Same var names as local dev so one code path serves both.

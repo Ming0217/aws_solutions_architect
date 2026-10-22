@@ -16,13 +16,18 @@ if ! id appuser >/dev/null 2>&1; then
   useradd --system --no-create-home --shell /usr/sbin/nologin appuser
 fi
 
+# --- Python 3.11 -------------------------------------------------------------
+# Amazon Linux 2023's default python3 is 3.9, but the app needs 3.11+
+# (api/main.py uses `from datetime import UTC`, added in 3.11).
+dnf install -y python3.11
+
 # --- app code + venv ---------------------------------------------------------
 install -d -o appuser -g appuser /opt/video-web
 install -o appuser -g appuser -m 0644 /tmp/main.py    /opt/video-web/main.py
 install -o appuser -g appuser -m 0644 /tmp/signing.py /opt/video-web/signing.py
 install -o appuser -g appuser -m 0644 /tmp/requirements.txt /opt/video-web/requirements.txt
 
-python3 -m venv /opt/video-web/.venv
+python3.11 -m venv /opt/video-web/.venv
 /opt/video-web/.venv/bin/pip install --upgrade pip
 /opt/video-web/.venv/bin/pip install -r /opt/video-web/requirements.txt
 chown -R appuser:appuser /opt/video-web/.venv

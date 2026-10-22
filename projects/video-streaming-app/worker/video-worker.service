@@ -12,7 +12,7 @@ Group=appuser
 # the instance's CDK-injected values.
 EnvironmentFile=/etc/video-worker.env
 WorkingDirectory=/opt/video-worker
-ExecStart=/usr/bin/python3 /opt/video-worker/worker.py
+ExecStart=/opt/video-worker/.venv/bin/python /opt/video-worker/worker.py
 Restart=always
 RestartSec=5
 # Graceful drain: give the SIGTERM handler time to finish the in-flight

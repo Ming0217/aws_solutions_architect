@@ -268,6 +268,11 @@ class VideoAppStack(Stack):
         distribution = cloudfront.Distribution(
             self, "Distribution",
             comment="video-streaming single public surface",
+            # Serve index.html for the bare root `/` (otherwise S3 returns 403).
+            # This is the default (site) behavior only -- it does NOT touch the
+            # /media/* signed-cookie 403 refresh path or the /api/* behavior,
+            # and deliberately avoids a distribution-wide 403->index mapping.
+            default_root_object="index.html",
             default_behavior=cloudfront.BehaviorOptions(
                 origin=site_origin,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -528,6 +533,7 @@ class VideoAppStack(Stack):
             user_data,
             assets=[
                 ("WorkerCodeAsset", "../worker/worker.py", "/tmp/worker.py"),
+                ("WorkerReqAsset", "../worker/requirements.txt", "/tmp/requirements.txt"),
                 ("WorkerServiceAsset", "../worker/video-worker.service",
                  "/tmp/video-worker.service"),
             ],
