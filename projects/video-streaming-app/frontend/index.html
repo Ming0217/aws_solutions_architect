@@ -3,45 +3,185 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Video Streaming</title>
+    <title>StreamVault — Video Streaming</title>
     <link rel="stylesheet" href="styles.css" />
     <!-- hls.js from CDN; no build step. app.js loads as an ES module. -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
     <script type="module" src="app.js"></script>
   </head>
   <body>
-    <header>
-      <h1>Video Streaming</h1>
+    <!-- ---------- Top app bar (YouTube-style) ---------- -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="#" aria-label="StreamVault home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="3" />
+              <path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span class="brand-name">StreamVault</span>
+        </a>
+
+        <div class="searchbar">
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+          </span>
+          <input
+            type="search"
+            id="search-input"
+            class="search-input"
+            placeholder="Search your videos"
+            aria-label="Search your videos by title"
+            autocomplete="off"
+          />
+        </div>
+
+        <button type="button" class="btn btn-primary btn-upload" data-upload-open>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span class="btn-upload-label">Upload</span>
+        </button>
+      </div>
     </header>
 
-    <main>
-      <section id="upload-section">
-        <h2>Upload a video</h2>
-        <form id="upload-form">
-          <label>
-            Title (optional)
-            <input type="text" id="title-input" name="title" maxlength="200" />
-          </label>
-          <label>
-            File
-            <input type="file" id="file-input" name="file" accept="video/*" required />
-          </label>
-          <button type="submit" id="upload-button">Upload</button>
-        </form>
-        <p id="upload-status" class="muted" role="status"></p>
+    <main class="page">
+      <!-- ---------- Landing hero (persistent; primary entry point) ---------- -->
+      <section id="hero" class="hero">
+        <div class="hero-backdrop"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <span class="hero-eyebrow">StreamVault</span>
+          <h1 class="hero-title">Your videos, beautifully streamed.</h1>
+          <p class="hero-tagline">
+            Upload once and watch anywhere. StreamVault transcodes your footage
+            and streams it back in crisp adaptive quality.
+          </p>
+          <div class="hero-actions">
+            <button type="button" class="btn btn-light btn-lg" data-upload-open>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Upload a video
+            </button>
+          </div>
+        </div>
       </section>
 
-      <section id="player-section" hidden>
-        <h2 id="player-title">Now playing</h2>
-        <video id="player" controls playsinline></video>
-        <p id="player-status" class="muted" role="status"></p>
-      </section>
+      <!-- ---------- Library ---------- -->
+      <section id="gallery-section" class="library">
+        <div class="section-head">
+          <h2 class="section-title">Your videos</h2>
+        </div>
 
-      <section id="gallery-section">
-        <h2>Your videos</h2>
-        <p id="gallery-empty" class="muted">No videos yet. Upload one above.</p>
-        <ul id="gallery"></ul>
+        <!-- Loading skeletons (first load; toggled by app.js). -->
+        <div id="gallery-loading" class="video-grid" hidden>
+          <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+          <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+          <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+          <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+        </div>
+
+        <!-- Error state (toggled by app.js when the list request fails). -->
+        <div id="gallery-error" class="state state-error" hidden role="alert">
+          <span class="state-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v6" />
+              <path d="M12 16.5h.01" />
+            </svg>
+          </span>
+          <p class="state-title">Couldn't load your videos</p>
+          <p class="state-text muted">We couldn't reach the service. It will retry automatically.</p>
+        </div>
+
+        <!-- Empty state (no videos at all). -->
+        <div id="gallery-empty" class="state state-empty">
+          <span class="state-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+              <path d="M10 9.5l4.5 2.5L10 14.5z" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <p class="state-title">No videos yet</p>
+          <p class="state-text muted">Upload your first video to start building your library.</p>
+          <button type="button" class="btn btn-primary" data-upload-open>Upload a video</button>
+        </div>
+
+        <!-- No search matches (toggled by app.js). -->
+        <div id="gallery-nomatch" class="state state-empty" hidden>
+          <p class="state-title">No matches</p>
+          <p class="state-text muted">No videos match your search.</p>
+        </div>
+
+        <ul id="gallery" class="video-grid"></ul>
       </section>
     </main>
+
+    <!-- ---------- Upload modal / slide-over ---------- -->
+    <section id="upload-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-upload-close></div>
+      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
+        <div class="modal-head">
+          <h2 id="upload-modal-title">Upload a video</h2>
+          <button type="button" id="upload-close" class="btn-icon" aria-label="Close upload dialog" data-upload-close>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <form id="upload-form">
+          <!-- The dropzone is a label for #file-input: clicking it opens the
+               file dialog; drag-and-drop is wired in app.js and sets the same
+               #file-input. The <input> stays in the DOM (visually hidden) so
+               all existing JS (els.fileInput.files[0]) keeps working. -->
+          <label id="dropzone" class="dropzone" for="file-input">
+            <span class="dropzone-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4" />
+                <path d="M7 9l5-5 5 5" />
+                <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+              </svg>
+            </span>
+            <span class="dropzone-primary">Drop your video here</span>
+            <span class="dropzone-secondary">or <span class="dropzone-browse">browse files</span></span>
+            <span id="dropzone-filename" class="dropzone-filename" hidden></span>
+            <input type="file" id="file-input" name="file" accept="video/*" class="visually-hidden" required />
+          </label>
+
+          <div class="field">
+            <label class="field-label" for="title-input">Title <span class="muted">(optional)</span></label>
+            <input type="text" id="title-input" name="title" maxlength="200" placeholder="e.g. Launch demo — final cut" />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="upload-button" class="btn btn-primary">Upload</button>
+            <p id="upload-status" class="status muted" role="status"></p>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ---------- Player modal (Netflix-style overlay) ---------- -->
+    <section id="player-section" class="player-modal" hidden>
+      <div class="player-backdrop" data-player-close></div>
+      <div class="player-dialog" role="dialog" aria-modal="true" aria-labelledby="player-title">
+        <div class="player-head">
+          <h2 id="player-title">Now playing</h2>
+          <button type="button" id="player-close" class="btn-icon" aria-label="Close player">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <video id="player" controls playsinline></video>
+        <p id="player-status" class="muted" role="status"></p>
+      </div>
+    </section>
   </body>
 </html>
