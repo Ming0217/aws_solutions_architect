@@ -312,10 +312,8 @@ The remediated code was redeployed and run end-to-end. Results:
   (`app.js` `closeUploadModal()` on the success path), and `[hidden]` is forced
   with `display:none` so the player/upload modals stay closed until opened.
 - **End-to-end validated.** Browser upload → `Queued` → EC2/FFmpeg worker
-  cold-start (ASG 0→1) → `Ready` → **signed-cookie HLS playback in the browser**.
-  See [`docs/screenshots/01-landing-hero.png`](./docs/screenshots/01-landing-hero.png)
-  (landing page) and [`docs/screenshots/02-playback.png`](./docs/screenshots/02-playback.png)
-  (the clip playing in the player modal).
+  cold-start (ASG 0→1) → `Ready` → **signed-cookie HLS playback in the browser**
+  (screenshots below).
 - **Thumbnails deferred (future enhancement).** Gallery cards show a placeholder,
   not a poster frame — the pipeline generates no thumbnail and all media sits
   behind signed cookies, so a proper preview needs a frame extracted at transcode
@@ -323,6 +321,16 @@ The remediated code was redeployed and run end-to-end. Results:
   not a hardening objective (see DESIGN.md).
 - **Teardown re-verified** — `cdk destroy --all` removed every stack with no
   lingering buckets/table/queues/secret/log groups/distribution/ASGs.
+
+### Screenshots (live run, 2026-10-22)
+
+![StreamVault landing page — hero banner and the Flash video card marked READY](./docs/screenshots/01-landing-hero.png)
+
+*StreamVault landing page: hero banner, search, and the library showing the uploaded* Flash *clip marked `READY`.*
+
+![Signed-cookie HLS playback — the Flash clip playing in the player modal](./docs/screenshots/02-playback.png)
+
+*Signed-cookie HLS playback: the* Flash *clip playing in the player modal — the full upload → transcode → CloudFront signed-cookie path working live.*
 
 ## 10. Takeaways
 
