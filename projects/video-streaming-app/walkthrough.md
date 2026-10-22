@@ -69,6 +69,33 @@ Output bucket. This mirrors the v1→Phase-2 arc of
 Fuller rationale for each lives in [`DESIGN.md`](./DESIGN.md) and the
 [[projects/video-streaming-app|build doc]].
 
+### Network topology (private-by-default)
+
+![Hardened VPC network — public subnets hold only the NAT; ALB, web ASG, and worker ASG are all private, with three egress paths](./docs/diagrams/network-hardened.svg)
+
+The diagram (drawn from `iac/stacks/network_stack.py`) shows the design choice
+behind the Network row above: of everything in the VPC, **only the NAT gateway**
+is allowed in a public subnet; the internal ALB, web ASG, and worker ASG are all
+**private**. The private tier still reaches everything it needs through **three
+purpose-built egress paths** rather than public IPs:
+
+1. **General internet (outbound only)** — route → **NAT** (in a public subnet) →
+   **IGW**. Used e.g. to pull the pinned FFmpeg build.
+2. **AWS services, no internet** — **gateway endpoints** (S3, DynamoDB; a route,
+   free) and **interface endpoints** (SQS, Secrets Manager, and SSM×3) over the
+   AWS backbone. The SSM endpoints are what let **Session Manager** reach the
+   private worker with **no port 22 anywhere**.
+3. Ingress is a single chain: CloudFront → API Gateway → **VPC Link** →
+   **internal ALB** (`alb-sg` admits the VPC Link SG only) → **web ASG**
+   (`web-sg` admits `alb-sg:8000` only). `worker-sg` has **zero inbound rules**.
+
+> The single NAT lives in one AZ (the other public subnet is empty) — a
+> deliberate cost tradeoff (§6): outbound egress is a single-AZ risk, accepted
+> because the worker scales to zero and gateway endpoints keep S3/DynamoDB off the
+> NAT entirely. See [[learning-plan/04-networking/vpc-connectivity-model|the VPC
+> connectivity-model note]] for the general IGW/Route/NAT/Endpoint/SG model this
+> instantiates.
+
 ## 3. Assumptions (branch-point decisions, confirmed)
 
 Agreed with the user at the hardening branch point:

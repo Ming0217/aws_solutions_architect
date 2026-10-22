@@ -82,6 +82,56 @@ routing decides what's exposed. The public subnet holds only what must be
 internet-facing; everything else — app logic, data — defaults to private, blocked
 at the network layer even before security groups come into play.
 
+## The standard 4-subnet layout
+
+The most common starting VPC topology is **two tiers (public + private) × two
+Availability Zones = 4 subnets**. It's a 2×2 grid:
+
+| | AZ-a (e.g. us-east-1a) | AZ-b (e.g. us-east-1b) |
+| --- | --- | --- |
+| **Public** | Public Subnet 1 — `10.0.1.0/24` | Public Subnet 2 — `10.0.3.0/24` |
+| **Private** | Private Subnet 1 — `10.0.2.0/24` | Private Subnet 2 — `10.0.4.0/24` |
+
+Each axis buys a different property:
+
+- **Tier axis (public/private) = security.** The "road vs door" split — public
+  subnets have `0.0.0.0/0 → IGW`, private subnets don't. Put only internet-facing
+  things in public; workloads + data in private.
+- **AZ axis (two columns) = availability.** AZs are physically separate
+  datacenters, so spreading each tier across two AZs means one AZ's outage doesn't
+  take down the whole tier (the ASG keeps running in the surviving AZ).
+
+**Why four and not fewer** — two forces each force a doubling, and they multiply:
+
+1. **Two tiers** — separation of concerns (1 → 2).
+2. **Two AZs** — availability *and* two hard AWS requirements: an **ALB needs
+   subnets in ≥2 AZs** to be created at all, and an **RDS DB Subnet Group spans
+   ≥2 AZs** even for a single-AZ database (×2 → 4).
+
+Because of #2, the **second-AZ subnets often exist before any resilience feature
+is turned on** — they're there just to satisfy ALB/RDS validation (the "placeholder"
+subnets). They become "real" only when an ASG places a second instance or RDS
+Multi-AZ places a standby there.
+
+**CIDR mechanics:** VPC `10.0.0.0/16`, subnets `/24` → per the
+[[learning-plan/04-networking/ip-addresses-and-cidr|CIDR note]], only the **third
+octet varies** (`.1`, `.2`, `.3`, `.4`). Which number maps to which subnet is pure
+convention (AWS only requires each `/24` to fit the `/16` and not overlap); a
+common one is odd = public, even = private, interleaved by creation order.
+
+**Same skeleton, different fill** — the two projects in this repo both use this
+4-subnet layout but place different things in the public tier:
+
+| | Public subnets hold | Private subnets hold |
+| --- | --- | --- |
+| [[projects/photoshare-app\|PhotoShare]] | ALB (+ v1's EC2) | RDS; Phase-2 web ASG |
+| [[projects/video-streaming-app\|Video Streaming]] (hardened) | **only the NAT gateway** | internal ALB, web ASG, worker ASG |
+
+The video platform is the stricter **"private-by-default"** version: nothing is
+allowed in a public subnet except what physically must be (the NAT) — see
+[[learning-plan/04-networking/vpc-connectivity-model|the connectivity model note]]
+for how the private tier still reaches everything it needs.
+
 ## Internet Gateway, Route Tables & Subnet Associations
 
 Three pieces, like a house's connection to the street.
