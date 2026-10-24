@@ -120,6 +120,15 @@ How this plays out per identity type:
 - **AWS service → Role:** the service is the trusted principal in the trust
   policy (e.g. `ec2.amazonaws.com`), so there's no separate "permission to
   assume" step on the service side.
+  - **But the operator wiring it up needs `iam:PassRole`.** The permission
+    didn't vanish — it moved. A service isn't an IAM identity in your account, so
+    there's nothing to hold an `sts:AssumeRole` identity policy; the gate instead
+    falls on *you*. To hand a role to a service (attach the instance profile to
+    EC2, set a Lambda execution role), your **own** identity needs `iam:PassRole`
+    on that role's ARN. It's the "you can't delegate a role more privileged than
+    you're allowed to pass" guardrail — the real control point on the service
+    side, and a common exam/security gotcha (often paired with a `iam:PassedToService`
+    condition to restrict *which* service a role may be passed to).
   - **EC2** is special: you can't attach a role to an instance directly — AWS
     wraps it in an **instance profile** (a thin container around the role), and
     you attach *that* to the instance at launch or later via Actions → Security

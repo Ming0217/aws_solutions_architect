@@ -16,6 +16,7 @@ tags:
 
 > Part of [[learning-plan/06-security-iam/06-security-iam|Security, Identity & IAM]].
 > Related: [[learning-plan/01-cloud-foundations/01-cloud-foundations|Cloud Foundations]]
+> · [[learning-plan/06-security-iam/encryption-at-rest-vs-in-transit|Encryption at Rest vs In Transit]]
 
 Security and compliance are a **shared responsibility** between AWS and the customer.
 The dividing line is simple to remember:
