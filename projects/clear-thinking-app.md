@@ -70,6 +70,12 @@ model spend tied to the moments that matter.
 
 ## Architecture (Phase 1 — serverless, no VPC)
 
+> **How the SPA and the API actually connect:** the CloudFront/S3 frontend and the
+> API Gateway below are not wired server-side — the browser runs the S3-served
+> `app.js`, which then calls the API (here with a Cognito JWT). See
+> [[learning-plan/10-architecting/serverless-spa-api-wiring|SPA ↔ API wiring]] for the
+> general pattern (this app is its canonical serverless/JWT example).
+
 ```
                           ┌──────────────┐
         user ──────────►  │  CloudFront   │  (SPA: HTML/JS/CSS)
