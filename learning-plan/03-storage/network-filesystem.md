@@ -30,6 +30,10 @@ server. Many clients can access the same files at the same time.
 
 ## Block vs object vs file storage
 
+> Canonical treatment (decision heuristic, performance variants, Domain 3.1):
+> [[learning-plan/03-storage/object-block-file-storage|Object vs Block vs File Storage]].
+> This note is the **file** leg; the table below is the quick orientation.
+
 | Type | AWS example | What it is | Shared? |
 | --- | --- | --- | --- |
 | Block | EBS | Raw virtual disk attached to one VM; you format/mount it | No (one VM) |

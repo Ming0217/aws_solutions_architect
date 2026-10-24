@@ -467,6 +467,12 @@ playback URL. Both sides are guaranteed to agree.
 
 ## CloudFront + signed-cookie playback (private Output bucket)
 
+> **Why one CloudFront domain (SPA + `/api/*` + `/media/*`):** the browser runs the
+> S3-served `app.js`, which calls `/api/*` and loads `/media/*` on the *same origin* so
+> the signed cookies attach automatically (no CORS, no cross-domain cookie problem). See
+> [[learning-plan/10-architecting/serverless-spa-api-wiring|SPA ↔ API wiring]] for the
+> general pattern (this app is its single-domain / signed-cookie example).
+
 Closes the playback flag the clean way and follows the builder-security policy
 (storage never internet-exposed; private-bucket playback via signed credentials).
 

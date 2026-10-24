@@ -118,6 +118,10 @@ of who actually *read* the data, not just who had bucket access.
 
 ## Encryption at rest vs in transit
 
+> Fuller, service-agnostic treatment (threat table, AWS examples, exam cues):
+> [[learning-plan/06-security-iam/encryption-at-rest-vs-in-transit|Encryption at Rest vs In Transit]].
+> The summary below is the S3/KMS-specific view.
+
 - **At rest** — protects data *while stored on disk*. Before S3 writes an
   object's bytes to the underlying storage medium, it encrypts them with the
   data key; on read, it decrypts *after* retrieving from disk, before handing
