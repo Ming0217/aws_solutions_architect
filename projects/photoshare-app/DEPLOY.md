@@ -60,24 +60,44 @@ cfn-lint photoshare-phase2.yaml      # optional
 
 ## Step 2 — Build & push the app image to ECR
 
-The EC2 instances pull `AppImageUri` on launch. For a faithful demo of the
-self-built FastAPI app:
+The EC2 instances pull `AppImageUri` on launch. **Three gotchas learned the hard way:**
+
+1. **Build for `linux/amd64`.** The EC2 AMI/instance is x86_64; an Apple-Silicon Mac
+   builds arm64 by default, which the host can't run (silent ASG crash-loop). Always
+   pass `--platform linux/amd64`.
+2. **zsh mangles `:latest`.** In zsh, `$ECR:latest` applies the `:l` (lowercase)
+   modifier, producing `…photoshare-appatest`. Use the brace form `"${ECR}:latest"`.
+3. **Create the ECR repo first, with a region set.** ECR `login` succeeds even when
+   the repo doesn't exist, so a missing repo (or a region-less `create-repository`
+   that silently no-ops) only surfaces at `push` time as a 404.
+
+**Container engine:** at Amazon, Docker Desktop is org-gated (it refuses to build
+until you sign into the `amazonians` org). If you're not signed in, use **Finch**
+(`~/.toolbox/bin/finch`) — no sign-in required:
 
 ```bash
+finch vm status >/dev/null 2>&1 || finch vm init     # first-run VM (~2-5 min)
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-REGION=us-east-1; REPO=photoshare-app
+REGION=us-east-1
+ECR="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/photoshare-app"
 cd ../app
-aws ecr create-repository --repository-name $REPO 2>/dev/null || true
-aws ecr get-login-password --region $REGION \
-  | docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.$REGION.amazonaws.com
-docker build -t $REPO .
-docker tag $REPO:latest $ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPO:latest
-docker push $ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPO:latest
+aws ecr create-repository --repository-name photoshare-app --region "$REGION" 2>/dev/null || true
+aws ecr get-login-password --region "$REGION" \
+  | finch login --username AWS --password-stdin "${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
+finch build --platform linux/amd64 -t "${ECR}:latest" .
+finch push "${ECR}:latest"
+# verify it landed:
+aws ecr describe-images --repository-name photoshare-app --region "$REGION" \
+  --query "imageDetails[].imageTags" --output text      # expect: latest
 ```
 
-- **No local Docker?** Build via **CodeBuild** (privileged) pointing at `app/` with
-  `app/buildspec.yml`, env vars `ACCOUNT_ID`, `AWS_DEFAULT_REGION`,
-  `REPO_URI=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/photoshare-app`.
+> Docker Desktop works identically — swap `finch` → `docker` — **once you're signed
+> into the org**. Either way keep `--platform linux/amd64` and the `"${ECR}:latest"`
+> brace form.
+
+- **No local engine at all?** Build via **CodeBuild** (privileged) pointing at `app/`
+  with `app/buildspec.yml`, env vars `ACCOUNT_ID`, `AWS_DEFAULT_REGION`,
+  `REPO_URI=${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/photoshare-app`.
 - **Quickest / least faithful:** skip this step and deploy with the template default
   `AppImageUri=kodekloud/photosharing-app` (public image). Works, but it's the tutorial
   image, not your UI, and may not honor the `/internal/metadata` contract.
