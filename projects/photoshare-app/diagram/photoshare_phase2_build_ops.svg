@@ -15,78 +15,78 @@
 <path fill="#e5f5fd" stroke="#aeb6be" d="M517.85,-229.8C517.85,-229.8 634.35,-229.8 634.35,-229.8 640.35,-229.8 646.35,-235.8 646.35,-241.8 646.35,-241.8 646.35,-390.8 646.35,-390.8 646.35,-396.8 640.35,-402.8 634.35,-402.8 634.35,-402.8 517.85,-402.8 517.85,-402.8 511.85,-402.8 505.85,-396.8 505.85,-390.8 505.85,-390.8 505.85,-241.8 505.85,-241.8 505.85,-235.8 511.85,-229.8 517.85,-229.8"/>
 <text text-anchor="middle" x="576.1" y="-387.4" font-family="Sans-Serif" font-size="12.00" fill="#2d3436">VPC — private subnets</text>
 </g>
-<!-- f166303814af4d8bbe7d7ec3a3194e3e -->
+<!-- b3f5f2a6a26b45169e8dc84fa4b143c9 -->
 <g id="node1" class="node">
-<title>f166303814af4d8bbe7d7ec3a3194e3e</title>
+<title>b3f5f2a6a26b45169e8dc84fa4b143c9</title>
 <image xlink:href="/Users/mingxmh/Desktop/Desktop/team_goals/sa_training/aws_solutions_architect/projects/photoshare-app/diagram/.venv/lib/python3.12/site-packages/resources/aws/devtools/codebuild.png" width="100.8px" height="100.8px" preserveAspectRatio="xMinYMin meet" x="-2.84217e-14" y="-497.2"/>
 <text text-anchor="middle" x="50.4" y="-378.65" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">CodeBuild</text>
 <text text-anchor="middle" x="50.4" y="-365.15" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">builds image</text>
 </g>
-<!-- 9518db2336604114aa6503088d08202f -->
+<!-- 942c6492a3f648a7989f53656fe559e3 -->
 <g id="node2" class="node">
-<title>9518db2336604114aa6503088d08202f</title>
+<title>942c6492a3f648a7989f53656fe559e3</title>
 <image xlink:href="/Users/mingxmh/Desktop/Desktop/team_goals/sa_training/aws_solutions_architect/projects/photoshare-app/diagram/.venv/lib/python3.12/site-packages/resources/aws/compute/ec2-container-registry.png" width="100.8px" height="100.8px" preserveAspectRatio="xMinYMin meet" x="210.05" y="-497.2"/>
 <text text-anchor="middle" x="260.45" y="-378.65" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">ECR</text>
 <text text-anchor="middle" x="260.45" y="-365.15" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">app image</text>
 </g>
-<!-- f166303814af4d8bbe7d7ec3a3194e3e&#45;&gt;9518db2336604114aa6503088d08202f -->
+<!-- b3f5f2a6a26b45169e8dc84fa4b143c9&#45;&gt;942c6492a3f648a7989f53656fe559e3 -->
 <g id="edge1" class="edge">
-<title>f166303814af4d8bbe7d7ec3a3194e3e&#45;&gt;9518db2336604114aa6503088d08202f</title>
+<title>b3f5f2a6a26b45169e8dc84fa4b143c9&#45;&gt;942c6492a3f648a7989f53656fe559e3</title>
 <path fill="none" stroke="#7b8894" d="M100.71,-446.8C100.71,-446.8 198.67,-446.8 198.67,-446.8"/>
 <polygon fill="#7b8894" stroke="#7b8894" points="198.67,-450.3 208.67,-446.8 198.67,-443.3 198.67,-450.3"/>
 <text text-anchor="middle" x="155.42" y="-447.95" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">push</text>
 </g>
-<!-- f1afdd59dfcd45a9a7744db3e7aa7e1c -->
+<!-- 9f5828b0479f4c50acee2ce498ea3a82 -->
 <g id="node5" class="node">
-<title>f1afdd59dfcd45a9a7744db3e7aa7e1c</title>
+<title>9f5828b0479f4c50acee2ce498ea3a82</title>
 <image xlink:href="/Users/mingxmh/Desktop/Desktop/team_goals/sa_training/aws_solutions_architect/projects/photoshare-app/diagram/.venv/lib/python3.12/site-packages/resources/aws/compute/ec2.png" width="100.8px" height="100.8px" preserveAspectRatio="xMinYMin meet" x="525.2" y="-356.2"/>
 <text text-anchor="middle" x="575.6" y="-238.55" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">EC2 web (ASG)</text>
 </g>
-<!-- 9518db2336604114aa6503088d08202f&#45;&gt;f1afdd59dfcd45a9a7744db3e7aa7e1c -->
+<!-- 942c6492a3f648a7989f53656fe559e3&#45;&gt;9f5828b0479f4c50acee2ce498ea3a82 -->
 <g id="edge2" class="edge">
-<title>9518db2336604114aa6503088d08202f&#45;&gt;f1afdd59dfcd45a9a7744db3e7aa7e1c</title>
+<title>942c6492a3f648a7989f53656fe559e3&#45;&gt;9f5828b0479f4c50acee2ce498ea3a82</title>
 <path fill="none" stroke="#7b8894" d="M310.73,-369.1C310.73,-369.1 513.72,-369.1 513.72,-369.1"/>
 <polygon fill="#7b8894" stroke="#7b8894" points="513.72,-372.6 523.72,-369.1 513.72,-365.6 513.72,-372.6"/>
 <text text-anchor="middle" x="412.35" y="-373.95" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">image pull on launch</text>
 </g>
-<!-- 34bd1362b19341a488711566c4bd59ee -->
+<!-- 67a58da7eeec47db8b5176a542711566 -->
 <g id="node3" class="node">
-<title>34bd1362b19341a488711566c4bd59ee</title>
+<title>67a58da7eeec47db8b5176a542711566</title>
 <image xlink:href="/Users/mingxmh/Desktop/Desktop/team_goals/sa_training/aws_solutions_architect/projects/photoshare-app/diagram/.venv/lib/python3.12/site-packages/resources/aws/management/systems-manager.png" width="100.8px" height="100.8px" preserveAspectRatio="xMinYMin meet" x="210.05" y="-288.2"/>
 <text text-anchor="middle" x="260.45" y="-169.65" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">Session Manager</text>
 <text text-anchor="middle" x="260.45" y="-156.15" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">admin, no SSH</text>
 </g>
-<!-- 34bd1362b19341a488711566c4bd59ee&#45;&gt;f1afdd59dfcd45a9a7744db3e7aa7e1c -->
+<!-- 67a58da7eeec47db8b5176a542711566&#45;&gt;9f5828b0479f4c50acee2ce498ea3a82 -->
 <g id="edge3" class="edge">
-<title>34bd1362b19341a488711566c4bd59ee&#45;&gt;f1afdd59dfcd45a9a7744db3e7aa7e1c</title>
+<title>67a58da7eeec47db8b5176a542711566&#45;&gt;9f5828b0479f4c50acee2ce498ea3a82</title>
 <path fill="none" stroke="#7b8894" stroke-dasharray="5,2" d="M310.73,-279C310.73,-279 513.72,-279 513.72,-279"/>
 <polygon fill="#7b8894" stroke="#7b8894" points="513.72,-282.5 523.72,-279 513.72,-275.5 513.72,-282.5"/>
 <text text-anchor="middle" x="412.35" y="-238.95" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">admin session</text>
 </g>
-<!-- ef645c74a6234c1aa5336c167f68a790 -->
+<!-- d977e717507d492682b6eab3d3b1679e -->
 <g id="node4" class="node">
-<title>ef645c74a6234c1aa5336c167f68a790</title>
+<title>d977e717507d492682b6eab3d3b1679e</title>
 <image xlink:href="/Users/mingxmh/Desktop/Desktop/team_goals/sa_training/aws_solutions_architect/projects/photoshare-app/diagram/.venv/lib/python3.12/site-packages/resources/aws/management/cloudwatch.png" width="100.8px" height="100.8px" preserveAspectRatio="xMinYMin meet" x="797.1" y="-193.2"/>
 <text text-anchor="middle" x="847.5" y="-74.65" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">CloudWatch</text>
 <text text-anchor="middle" x="847.5" y="-61.15" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">logs, metrics, alarms</text>
 </g>
-<!-- f1afdd59dfcd45a9a7744db3e7aa7e1c&#45;&gt;ef645c74a6234c1aa5336c167f68a790 -->
+<!-- 9f5828b0479f4c50acee2ce498ea3a82&#45;&gt;d977e717507d492682b6eab3d3b1679e -->
 <g id="edge4" class="edge">
-<title>f1afdd59dfcd45a9a7744db3e7aa7e1c&#45;&gt;ef645c74a6234c1aa5336c167f68a790</title>
+<title>9f5828b0479f4c50acee2ce498ea3a82&#45;&gt;d977e717507d492682b6eab3d3b1679e</title>
 <path fill="none" stroke="#7b8894" d="M575.9,-237.52C575.9,-222.06 575.9,-210.1 575.9,-210.1 575.9,-210.1 785.85,-210.1 785.85,-210.1"/>
 <polygon fill="#7b8894" stroke="#7b8894" points="785.85,-213.6 795.85,-210.1 785.85,-206.6 785.85,-213.6"/>
 <text text-anchor="middle" x="717.72" y="-240.95" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">logs / metrics</text>
 </g>
-<!-- 54706e14e62745bd981b6ef12fd4438d -->
+<!-- 3aabdb8bbc4a45aa84efd018009ff51d -->
 <g id="node6" class="node">
-<title>54706e14e62745bd981b6ef12fd4438d</title>
+<title>3aabdb8bbc4a45aa84efd018009ff51d</title>
 <image xlink:href="/Users/mingxmh/Desktop/Desktop/team_goals/sa_training/aws_solutions_architect/projects/photoshare-app/diagram/.venv/lib/python3.12/site-packages/resources/aws/compute/lambda.png" width="100.8px" height="100.8px" preserveAspectRatio="xMinYMin meet" x="525.2" y="-162.2"/>
 <text text-anchor="middle" x="575.6" y="-43.65" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">Lambda image</text>
 <text text-anchor="middle" x="575.6" y="-30.15" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">processor</text>
 </g>
-<!-- 54706e14e62745bd981b6ef12fd4438d&#45;&gt;ef645c74a6234c1aa5336c167f68a790 -->
+<!-- 3aabdb8bbc4a45aa84efd018009ff51d&#45;&gt;d977e717507d492682b6eab3d3b1679e -->
 <g id="edge5" class="edge">
-<title>54706e14e62745bd981b6ef12fd4438d&#45;&gt;ef645c74a6234c1aa5336c167f68a790</title>
+<title>3aabdb8bbc4a45aa84efd018009ff51d&#45;&gt;d977e717507d492682b6eab3d3b1679e</title>
 <path fill="none" stroke="#7b8894" d="M625.79,-127.3C625.79,-127.3 785.63,-127.3 785.63,-127.3"/>
 <polygon fill="#7b8894" stroke="#7b8894" points="785.63,-130.8 795.63,-127.3 785.63,-123.8 785.63,-130.8"/>
 <text text-anchor="middle" x="717.72" y="-112.95" font-family="Sans-Serif" font-size="13.00" fill="#2d3436">logs / metrics</text>
