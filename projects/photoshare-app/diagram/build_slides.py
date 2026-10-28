@@ -1,5 +1,7 @@
-"""Build a self-contained slides.html with the three Phase 2 diagrams embedded
-as base64 PNGs (no external image files, so it works wherever it's opened).
+"""Build a self-contained slides.html with the three diagrams embedded as base64
+PNGs (no external image files, so it works wherever it's opened). Each slide has
+a consistent HTML title rendered by CSS (identical size on every slide); the
+diagram PNGs themselves carry no baked-in title.
 
 Run:  python build_slides.py   # regenerates slides.html in this folder
 """
@@ -7,10 +9,11 @@ import base64
 import pathlib
 
 HERE = pathlib.Path(__file__).parent
+# (png filename, slide title, img alt)
 SLIDES = [
-    ("photoshare_phase2.png", "PhotoShare Phase 2 — main architecture"),
-    ("photoshare_phase2_pipeline.png", "PhotoShare Phase 2 — async image pipeline"),
-    ("photoshare_phase2_build_ops.png", "PhotoShare Phase 2 — build & operations"),
+    ("photoshare_phase2.png", "PhotoShare — Main architecture", "PhotoShare main architecture"),
+    ("photoshare_phase2_pipeline.png", "PhotoShare — Image pipeline", "PhotoShare async image pipeline"),
+    ("photoshare_phase2_build_ops.png", "PhotoShare — Build & operations", "PhotoShare build and operations"),
 ]
 
 
@@ -22,10 +25,13 @@ def data_uri(png_name: str) -> str:
 
 def main() -> None:
     sections = []
-    for idx, (png, alt) in enumerate(SLIDES):
+    for idx, (png, title, alt) in enumerate(SLIDES):
         active = " active" if idx == 0 else ""
         sections.append(
-            f'  <section class="slide{active}"><img src="{data_uri(png)}" alt="{alt}" /></section>'
+            f'  <section class="slide{active}">\n'
+            f'    <h2 class="slide-title">{title}</h2>\n'
+            f'    <img src="{data_uri(png)}" alt="{alt}" />\n'
+            f'  </section>'
         )
     slides_html = "\n".join(sections)
 
@@ -34,15 +40,17 @@ def main() -> None:
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>PhotoShare — Phase 2 Architecture</title>
+<title>PhotoShare — Architecture</title>
 <style>
   * {{ box-sizing: border-box; }}
   html, body {{ margin: 0; height: 100%; background: #fff; overflow: hidden; }}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
   .deck {{ position: fixed; inset: 0; }}
-  .slide {{ position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 3vh 3vw; background: #fff; }}
+  .slide {{ position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: flex-start; padding: 3vh 3vw 4vh; background: #fff; }}
   .slide.active {{ display: flex; }}
-  .slide img {{ max-width: 96vw; max-height: 94vh; object-fit: contain; }}
+  /* Identical title styling on every slide -> consistent size across all three. */
+  .slide-title {{ margin: 0 0 1.4vh; font-size: 30px; font-weight: 700; color: #232f3e; text-align: center; flex: 0 0 auto; }}
+  .slide img {{ flex: 1 1 auto; min-height: 0; max-width: 94vw; max-height: 84vh; object-fit: contain; }}
   .chrome {{ position: fixed; left: 0; right: 0; bottom: 0; height: 5px; background: #e3e8ee; z-index: 10; }}
   .bar {{ height: 100%; width: 0; background: #ec7211; transition: width .2s ease; }}
   .nav {{ position: fixed; bottom: 12px; right: 16px; display: flex; gap: 8px; z-index: 11; }}

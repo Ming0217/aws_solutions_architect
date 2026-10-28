@@ -31,7 +31,7 @@ OUT = ["png", "svg"]
 # View 1 — MAIN: request path (left->right) + data tier (Multi-AZ) + security
 # --------------------------------------------------------------------------- #
 with Diagram(
-    "PhotoShare - Phase 2 (main)",
+    "",
     filename="photoshare_phase2",
     outformat=OUT,
     show=False,
@@ -83,7 +83,7 @@ with Diagram(
 # View 2 — BUILD & OPS: image to the fleet, logging, admin
 # --------------------------------------------------------------------------- #
 with Diagram(
-    "PhotoShare - Phase 2 (build & ops)",
+    "",
     filename="photoshare_phase2_build_ops",
     outformat=OUT,
     show=False,
@@ -109,7 +109,7 @@ with Diagram(
 # View 3 — ASYNC IMAGE PIPELINE: S3 event -> Lambda -> callback through the ALB
 # --------------------------------------------------------------------------- #
 with Diagram(
-    "PhotoShare - Phase 2 (image pipeline)",
+    "",
     filename="photoshare_phase2_pipeline",
     outformat=OUT,
     show=False,
