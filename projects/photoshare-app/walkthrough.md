@@ -103,6 +103,48 @@ These drive the design:
   at ~99.9% since it doesn't affect inbound user traffic or the RDS failover path.
   A per-AZ NAT would remove this at ~2× NAT cost.
 
+### Deep-dive: the Lambda → ALB callback (rationale & hardening)
+
+**Flow.** S3 `ObjectCreated` → the image-processor Lambda (**outside the VPC**)
+reads only the object *header* from S3, extracts dimensions/format (stdlib, no
+Pillow), then `POST http://<alb-dns>/internal/metadata` with an `X-Internal-Key`
+header; the **web app** writes the row to RDS. The Lambda never touches the
+database. On failure the exception propagates → Lambda retry → `photoshare-image-dlq`.
+
+**Why route the DB write through the app instead of writing from the Lambda:**
+
+1. **Keep Lambda out of the VPC** — it only needs S3 + outbound HTTP. VPC
+   attachment would force its own connectivity plan (NAT or VPC endpoints) and add
+   ENI cold-start latency.
+2. **Least privilege / smallest blast radius** — the Lambda role has no RDS or
+   Secrets Manager access, no DB driver, no schema knowledge; a compromised
+   function still can't reach the private database.
+3. **Single writer** — the app already owns the DB connection, the Secrets Manager
+   credentials, the schema, and validation. One write path means consistent
+   validation and one place to change for migrations.
+4. **Reuse the existing front door** — the ALB is already the sole ingress to the
+   web tier; no new path into the app.
+5. **Async + retries** — being S3-event driven, a transient app/DB failure retries
+   and lands in the DLQ instead of being lost.
+
+**The weakness (stated honestly).** The callback hits the **public ALB over HTTP
+(:80, plaintext)**, authenticated only by a **static shared secret** — i.e.
+invented auth over an unencrypted, internet-reachable endpoint. Acceptable for this
+no-auth lab pass; not a production pattern.
+
+**Hardening options (increasing rigor):**
+
+- Add **HTTPS** (ACM cert + 443 listener) so the callback is encrypted — minimum bar.
+- Move `/internal/*` off the public listener onto a **separate internal ALB listener**.
+- Replace the HTTP callback with a cloud-native handoff: Lambda → **SQS** the app
+  drains, Lambda → **API Gateway (SigV4 / IAM)**, or write metadata to **DynamoDB**.
+
+**Cross-project note.** The [[projects/video-streaming-app/DESIGN|video-streaming-app]]
+faced the same "an external component needs to reach an internal service" shape and
+solved it with **API Gateway + VPC Link → internal ALB** (all private, HTTPS).
+PhotoShare instead keeps the Lambda out of the VPC and calls the *public* ALB —
+simpler, but with the plaintext public hop above. Two valid answers to one problem.
+
 ## 5. Failure modes  *(mitigations deployed in Phase 2)*
 
 For each component: what happens if it fails, blast radius, and the mitigation.

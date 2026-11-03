@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PhotoShare — Architecture Deck Talking Script</title>
+<style>
+  :root { --navy:#232f3e; --orange:#ec7211; --ink:#1b2733; --muted:#5b6b7b; --line:#e3e8ee; --bg:#f4f6f9; --cue:#b45309; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         line-height: 1.6; }
+  .wrap { max-width: 840px; margin: 0 auto; padding: 40px 24px 80px; }
+  header.doc { border-bottom: 3px solid var(--orange); padding-bottom: 16px; margin-bottom: 8px; }
+  header.doc h1 { color: var(--navy); margin: 0 0 6px; font-size: 30px; }
+  header.doc .meta { color: var(--muted); font-size: 15px; }
+  section.block { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px;
+                  margin: 20px 0; box-shadow: 0 3px 10px rgba(20,30,45,.04); }
+  h2 { color: var(--navy); margin: 0 0 4px; font-size: 22px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .time { background: var(--navy); color: #fff; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 10px; }
+  h3 { color: var(--navy); font-size: 16px; margin: 18px 0 2px; }
+  p { margin: 8px 0; }
+  .say { }
+  .say::before { content: "“"; } .say::after { content: "”"; }
+  .cue { display: block; color: var(--cue); font-style: italic; font-size: 14px; margin: 6px 0; }
+  .cue::before { content: "▸ "; }
+  .lead { color: var(--muted); font-style: italic; }
+  ul.qa { list-style: none; padding: 0; margin: 6px 0 0; }
+  ul.qa li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  ul.qa li:last-child { border-bottom: 0; }
+  ul.qa b { color: var(--navy); }
+  .transition { color: var(--muted); border-left: 3px solid var(--orange); padding: 2px 0 2px 12px; margin: 12px 0 0; }
+  code { background: #eef1f5; border-radius: 4px; padding: 1px 5px; font-size: .92em; }
+  @media print {
+    body { background: #fff; } .wrap { max-width: none; padding: 0 12px; }
+    section.block { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <h1>PhotoShare — Architecture Deck Talking Script</h1>
+    <div class="meta">Three slides · ~6–8 minutes · spoken lines in quotes, <span class="cue" style="display:inline">cues</span> are stage directions (don't read aloud). Deck: <code>slides.html</code>.</div>
+  </header>
+
+  <section class="block">
+    <h2>Opening <span class="time">~20 sec</span></h2>
+    <p class="lead">Before Slide 1.</p>
+    <p class="say">PhotoShare is an Instagram-style photo-sharing app. The design goal is simple to say and interesting to build: keep the public-facing parts clearly separated from the data, and process uploads in the background so the app scales without me managing servers. I built it as infrastructure-as-code in CloudFormation, deployed it to real AWS in us-east-1, and validated it end to end. Let me walk the architecture in three views.</p>
+    <span class="cue">advance to Slide 1</span>
+  </section>
+
+  <section class="block">
+    <h2>Slide 1 — Main architecture <span class="time">~2.5 min</span></h2>
+
+    <h3>Request path</h3>
+    <span class="cue">trace left → right as you talk</span>
+    <p class="say">A user hits the app over the internet. The only internet-facing component is the Application Load Balancer — it lives in public subnets across two Availability Zones. Everything behind it is private. The ALB forwards to the web tier, which is an Auto Scaling Group of EC2 instances running my FastAPI app in Docker, sitting in private subnets. The web tier talks to RDS MySQL for photo metadata.</p>
+
+    <h3>Security — the part I'm proudest of</h3>
+    <span class="cue">point to RDS</span>
+    <p class="say">The database is protected by three independent layers. One: it's in a private subnet with no route to the internet. Two: RDS 'public access' is switched off — a separate control. Three: the database security group only accepts traffic from the web tier's security group — not an IP range — so even another instance inside the VPC can't reach it. Only after all three pass does a connection even get to MySQL's own authentication. And there are no static credentials anywhere: the app fetches the DB password at runtime from Secrets Manager, decrypted by KMS.</p>
+
+    <h3>Reliability</h3>
+    <span class="cue">point to the two AZs / standby</span>
+    <p class="say">For resilience, the web tier spans two AZs and self-heals — during my deploy I actually watched the ASG replace an unhealthy instance automatically. RDS is Multi-AZ, so there's a synchronous standby in the second AZ ready to fail over. The one deliberate single point I accepted is a single NAT Gateway for outbound egress — a cost tradeoff; it doesn't affect inbound users or database failover.</p>
+
+    <p class="transition"><span class="cue" style="display:inline">advance to Slide 2</span> &nbsp; “That covers the live request path. But photo <em>processing</em> doesn't happen inline — it's offloaded. Here's how.”</p>
+  </section>
+
+  <section class="block">
+    <h2>Slide 2 — Image pipeline <span class="time">~2 min</span></h2>
+
+    <h3>The flow</h3>
+    <span class="cue">trace S3 → Lambda → ALB → DLQ</span>
+    <p class="say">When a photo lands in S3, it fires an event that triggers a Lambda. The Lambda reads just the image header, extracts the dimensions and format, and then — this is the key design choice — it calls back into the web app through the ALB, and the app writes the metadata to the database. The Lambda never touches the database itself. If that callback keeps failing, the message lands in a dead-letter queue instead of being lost.</p>
+
+    <h3>Why design it this way</h3>
+    <span class="cue">the "I understand tradeoffs" moment</span>
+    <p class="say">Three reasons. First, it keeps the Lambda out of the VPC — it only needs S3 and outbound HTTP, so I avoid the NAT and cold-start overhead a VPC-attached Lambda would need. Second, least privilege: the Lambda's role has no database access, no credentials, no schema — if it were ever compromised, it still can't reach the private database. Third, one writer — the app already owns the DB connection, the credentials, and the validation, so I reuse that instead of duplicating it in the function.</p>
+
+    <h3>The honest tradeoff</h3>
+    <span class="cue">don't skip this — it lands well</span>
+    <p class="say">Now, the weak spot: because the Lambda is outside the VPC, that callback goes to the public ALB over plain HTTP, authenticated only by a shared secret header. That's fine for this no-auth lab pass, but it's not production-grade. The hardening path would be HTTPS on the callback, moving that internal route off the public listener, or replacing the HTTP call entirely with a queue or API Gateway. Worth noting: in another project I solved this exact 'external component needs an internal service' problem with API Gateway and a VPC Link — same problem, a more secure answer.</p>
+
+    <p class="transition"><span class="cue" style="display:inline">advance to Slide 3</span> &nbsp; “Last view — how it's built and operated.”</p>
+  </section>
+
+  <section class="block">
+    <h2>Slide 3 — Build &amp; operations <span class="time">~1.5 min</span></h2>
+    <span class="cue">point to each as you go</span>
+    <p class="say">The app image is built in the cloud with CodeBuild and pushed to ECR — I never needed a local Docker daemon — and the EC2 instances pull that image on launch. For administration, there's no SSH and no open ports: I use Systems Manager Session Manager to get a shell on the private instances. And CloudWatch collects logs, metrics, and alarms from both the web tier and the Lambda, so I can see CPU, errors, and the DLQ depth.</p>
+  </section>
+
+  <section class="block">
+    <h2>Closing <span class="time">~30 sec</span></h2>
+    <p class="say">To tie it to the Well-Architected pillars: security through the private database and no static credentials; reliability through the two-AZ ASG, RDS Multi-AZ, and the dead-letter queue; performance through auto-scaling and serverless processing; and cost control through small instances, a single NAT, and pay-per-use Lambda and S3 — about four dollars for a demo day, torn down after. The whole thing is reproducible CloudFormation, and deploying it for real is what surfaced the bugs that static checks miss. Happy to dig into any piece.</p>
+  </section>
+
+  <section class="block">
+    <h2>Q&amp;A prep — likely questions</h2>
+    <ul class="qa">
+      <li><b>Why EC2 for the web tier, not Lambda or Fargate?</b> It's a long-running web server; EC2 behind an ASG is the faithful, cost-predictable choice. The bursty image work is where I used serverless.</li>
+      <li><b>Why Multi-AZ RDS vs. read replicas?</b> Multi-AZ is for availability (failover standby), not read scaling. Read replicas would be the answer if reads were the bottleneck.</li>
+      <li><b>Why only one NAT Gateway?</b> Cost. A per-AZ NAT removes the egress single-point at ~2× NAT cost; acceptable here since it's outbound-only.</li>
+      <li><b>Why does the Lambda call back through the ALB instead of writing to RDS?</b> Least privilege + keeping it out of the VPC + a single DB writer (see Slide 2).</li>
+      <li><b>How did you build the image without Docker locally?</b> CodeBuild → ECR; I also have a Finch path for local builds. The one gotcha: build for <code>linux/amd64</code> since the EC2 hosts are x86_64.</li>
+      <li><b>Is it secure right now?</b> The app has no user auth this pass and the ALB is public — a knowing choice for the demo; I tear it down the same day. The data tier is fully private regardless.</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>
